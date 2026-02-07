@@ -168,14 +168,14 @@ g1_23dof = RobotConfig(
     ],
     dof_vel_limit_list=[
         # Left leg (6): hip_pitch, hip_roll, hip_yaw, knee, ankle_pitch, ankle_roll
-        20.0,
+        32.0,
         20.0,
         32.0,
         20.0,
         30.0,
         30.0,
         # Right leg (6)
-        20.0,
+        32.0,
         20.0,
         32.0,
         20.0,
@@ -198,14 +198,14 @@ g1_23dof = RobotConfig(
     ],
     dof_effort_limit_list=[
         # Left leg (6): hip_pitch, hip_roll, hip_yaw, knee, ankle_pitch, ankle_roll
-        139.0,
+        88.0,
         139.0,
         88.0,
         139.0,
         35.0,
         35.0,
         # Right leg (6)
-        139.0,
+        88.0,
         139.0,
         88.0,
         139.0,
@@ -458,9 +458,9 @@ g1_23dof = RobotConfig(
         max_linear_velocity=1000.0,
         angular_damping=0.0,
         linear_damping=0.0,
-        urdf_file="g1/g1_23dof_mode_10.urdf",
+        urdf_file="g1/g1_23dof_rev_1_0.urdf",
         usd_file=None,
-        xml_file="g1/g1_23dof_mode_10.xml",
+        xml_file="g1/g1_23dof_rev_1_0.xml",
         robot_type="g1_23dof",
         enable_self_collisions=False,
         default_dof_drive_mode=3,
