@@ -1,8 +1,7 @@
 <?xml version="1.0"?>
 
-<!-- G1 23-DOF model based on official g1_23dof_rev_1_0.urdf (mode 4, hip gear {14.3, 22.5})
-     with holosoma sim modifications applied (simplified collisions, foot contact points, etc.)
-     For mode 10 (hip gear {22.5, 22.5}), change hip_pitch effort=139 velocity=20. -->
+<!-- G1 23-DOF model based on official g1_23dof_mode_10.urdf (mode 10, hip gear {22.5, 22.5})
+     with holosoma sim modifications applied (simplified collisions, foot contact points, etc.) -->
 
 <robot name="g1_23dof">
 
@@ -72,7 +71,7 @@
         <parent link="pelvis"/>
         <child link="left_hip_pitch_link"/>
         <axis xyz="0 1 0"/>
-        <limit lower="-2.5307" upper="2.8798" effort="88" velocity="32"/>
+        <limit lower="-2.5307" upper="2.8798" effort="139" velocity="20"/>
     </joint>
     <link name="left_hip_roll_link">
         <inertial>
@@ -288,7 +287,7 @@
         <parent link="pelvis"/>
         <child link="right_hip_pitch_link"/>
         <axis xyz="0 1 0"/>
-        <limit lower="-2.5307" upper="2.8798" effort="88" velocity="32"/>
+        <limit lower="-2.5307" upper="2.8798" effort="139" velocity="20"/>
     </joint>
     <link name="right_hip_roll_link">
         <inertial>

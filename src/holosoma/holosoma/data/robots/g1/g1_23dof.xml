@@ -1,9 +1,8 @@
 <!-- G1 23-DOF MuJoCo model. Must stay consistent with g1_23dof.urdf.
-     Kinematics/inertials: from holosoma's g1_23dof.urdf (based on official g1_23dof_rev_1_0,
-     mode 4, hip gear {14.3, 22.5}, with holosoma sim modifications: ankle effort 50, foot
+     Kinematics/inertials: from holosoma's g1_23dof.urdf (based on official g1_23dof_mode_10,
+     mode 10, hip gear {22.5, 22.5}, with holosoma sim modifications: ankle effort 50, foot
      contact points, simplified collisions, d435 removed).
-     Sim features (armature, frictionloss, contact pairs, ankle tendons): from g1_29dof.xml.
-     For mode 10: change hip_pitch actuatorfrcrange to -139/139. -->
+     Sim features (armature, frictionloss, contact pairs, ankle tendons): from g1_29dof.xml. -->
 
 <mujoco model="g1_23dof">
     <compiler angle="radian" meshdir="./meshes/"/>
@@ -16,7 +15,7 @@
 
             <default class="hip">
                 <default class="hip_pitch">
-                    <joint axis="0 1 0" range="-2.5307 2.8798" actuatorfrcrange="-88 88" armature="0.01017752004"/>
+                    <joint axis="0 1 0" range="-2.5307 2.8798" actuatorfrcrange="-139 139" armature="0.025101925"/>
                 </default>
                 <default class="hip_roll">
                     <joint axis="1 0 0" actuatorfrcrange="-139 139" armature="0.025101925"/>
@@ -376,14 +375,14 @@
     </tendon>
 
     <actuator>
-        <motor name="left_hip_pitch_joint" joint="left_hip_pitch_joint" ctrlrange="-88 88"/>
+        <motor name="left_hip_pitch_joint" joint="left_hip_pitch_joint" ctrlrange="-139 139"/>
         <motor name="left_hip_roll_joint" joint="left_hip_roll_joint" ctrlrange="-139 139"/>
         <motor name="left_hip_yaw_joint" joint="left_hip_yaw_joint" ctrlrange="-88 88"/>
         <motor name="left_knee_joint" joint="left_knee_joint" ctrlrange="-139 139"/>
         <motor name="left_ankle_pitch_joint" joint="left_ankle_pitch_joint" ctrlrange="-50 50"/>
         <motor name="left_ankle_roll_joint" joint="left_ankle_roll_joint" ctrlrange="-50 50"/>
 
-        <motor name="right_hip_pitch_joint" joint="right_hip_pitch_joint" ctrlrange="-88 88"/>
+        <motor name="right_hip_pitch_joint" joint="right_hip_pitch_joint" ctrlrange="-139 139"/>
         <motor name="right_hip_roll_joint" joint="right_hip_roll_joint" ctrlrange="-139 139"/>
         <motor name="right_hip_yaw_joint" joint="right_hip_yaw_joint" ctrlrange="-88 88"/>
         <motor name="right_knee_joint" joint="right_knee_joint" ctrlrange="-139 139"/>

@@ -151,13 +151,13 @@ g1_23dof = RobotConfig(
         1.972222054,
     ],
     dof_vel_limit_list=[
-        32.0,
+        20.0,
         20.0,
         32.0,
         20.0,
         37.0,
         37.0,  # left leg (hip_pitch, hip_roll, hip_yaw, knee, ankle_pitch, ankle_roll)
-        32.0,
+        20.0,
         20.0,
         32.0,
         20.0,
@@ -176,13 +176,13 @@ g1_23dof = RobotConfig(
         37.0,  # right arm
     ],
     dof_effort_limit_list=[
-        88.0,
+        139.0,
         139.0,
         88.0,
         139.0,
         50.0,
         50.0,  # left leg (hip_pitch, hip_roll, hip_yaw, knee, ankle_pitch, ankle_roll)
-        88.0,
+        139.0,
         139.0,
         88.0,
         139.0,
@@ -201,13 +201,13 @@ g1_23dof = RobotConfig(
         25.0,  # right arm
     ],
     dof_armature_list=[
-        0.010177520,
+        0.025101925,
         0.025101925,
         0.010177520,
         0.025101925,
         0.007219450,
         0.007219450,  # left leg
-        0.010177520,
+        0.025101925,
         0.025101925,
         0.010177520,
         0.025101925,
@@ -407,7 +407,7 @@ g1_23dof = RobotConfig(
         stiffness={
             "hip_yaw": 40.179238471,  # STIFFNESS_7520_14
             "hip_roll": 99.098427777,  # STIFFNESS_7520_22
-            "hip_pitch": 40.179238471,  # STIFFNESS_7520_14
+            "hip_pitch": 99.098427777,  # STIFFNESS_7520_22
             "knee": 99.098427777,  # STIFFNESS_7520_22
             "ankle_pitch": 28.501246196,  # 2*STIFFNESS_5020
             "ankle_roll": 28.501246196,  # 2*STIFFNESS_5020
@@ -421,7 +421,7 @@ g1_23dof = RobotConfig(
         damping={
             "hip_yaw": 2.557889765,  # DAMPING_7520_14
             "hip_roll": 6.308801854,  # DAMPING_7520_22
-            "hip_pitch": 2.557889765,  # DAMPING_7520_14
+            "hip_pitch": 6.308801854,  # DAMPING_7520_22
             "knee": 6.308801854,  # DAMPING_7520_22
             "ankle_pitch": 1.814445687,  # 2*DAMPING_5020
             "ankle_roll": 1.814445687,  # 2*DAMPING_5020
