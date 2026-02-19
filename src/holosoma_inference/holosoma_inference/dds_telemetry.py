@@ -1,7 +1,5 @@
 """DDS message types for policy telemetry, recorded by NoisePrint."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 
 from cyclonedds.idl import IdlStruct
