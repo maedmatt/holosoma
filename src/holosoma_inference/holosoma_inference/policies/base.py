@@ -13,12 +13,16 @@ import netifaces as ni
 import numpy as np
 import onnx
 import onnxruntime
+from cyclonedds.domain import DomainParticipant
+from cyclonedds.pub import DataWriter
+from cyclonedds.topic import Topic
 from loguru import logger
 from sshkeyboard import listen_keyboard
 from termcolor import colored
 
 from holosoma_inference.config.config_types.inference import InferenceConfig
 from holosoma_inference.config.config_types.robot import RobotConfig
+from holosoma_inference.dds_telemetry import PolicyTelemetry
 from holosoma_inference.sdk import create_interface
 from holosoma_inference.utils.latency import LatencyTracker
 from holosoma_inference.utils.math.quat import quat_rotate_inverse
@@ -56,6 +60,8 @@ class BasePolicy:
         self._init_phase_components()
         # Initialize latency tracking
         self._init_latency_tracking()
+        # Initialize telemetry publishers
+        self._init_telemetry()
 
     # ============================================================================
     # Initialization Methods
@@ -288,6 +294,21 @@ class BasePolicy:
         """Initialize latency tracking components."""
         self.latency_tracker = LatencyTracker(window_size=int(self.rl_rate))
 
+    def _init_telemetry(self):
+        """Initialize DDS publishers for policy obs/action telemetry."""
+        self._obs_writer = None
+        self._action_writer = None
+
+        if not self.config.task.publish_telemetry:
+            return
+
+        self._dds_participant = DomainParticipant(domain_id=self.config.task.domain_id)
+        obs_topic = Topic(self._dds_participant, "rt/policy_obs", PolicyTelemetry)
+        action_topic = Topic(self._dds_participant, "rt/policy_action", PolicyTelemetry)
+        self._obs_writer = DataWriter(self._dds_participant, obs_topic)
+        self._action_writer = DataWriter(self._dds_participant, action_topic)
+        logger.info("Policy telemetry publishers initialized (rt/policy_obs, rt/policy_action)")
+
     def _init_input_handlers(self):
         """Initialize input handlers (ROS, joystick, keyboard)."""
         self._init_rate_handler()
@@ -474,11 +495,19 @@ class BasePolicy:
         if self.config.task.print_observations:
             self._print_observations(obs)
 
+        if self._obs_writer is not None:
+            self._obs_writer.write(PolicyTelemetry(timestamp=time.time(), data=obs["actor_obs"].flatten().tolist()))
+
         policy_action = self.policy(obs)
         policy_action = np.clip(policy_action, -100, 100)
 
         self.last_policy_action = policy_action.copy()
         self.scaled_policy_action = policy_action * self.policy_action_scale
+
+        if self._action_writer is not None:
+            self._action_writer.write(
+                PolicyTelemetry(timestamp=time.time(), data=self.last_policy_action.flatten().tolist())
+            )
 
         return self.scaled_policy_action
 

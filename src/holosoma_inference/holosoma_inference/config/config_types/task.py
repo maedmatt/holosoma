@@ -63,3 +63,6 @@ class TaskConfig:
 
     motion_end_timestep: int | None = None
     """Ending timestep for motion clip playback. If None, plays until the end."""
+
+    publish_telemetry: bool = True
+    """Publish policy obs/actions on DDS for NoisePrint recording."""
