@@ -12,9 +12,7 @@ from .base import BasePolicy
 _SCRIPTED_SEGMENTS: list[tuple[float, float, float]] = [
     (2.0, 0.0, 0.0),  # wait
     (5.0, 0.5, 0.0),  # walk forward
-    (math.pi, 0.0, 1.0),  # rotate 180 deg
-    (5.0, 0.5, 0.0),  # walk back
-    (math.pi, 0.0, 1.0),  # rotate 180 deg
+    (5.0, -0.5, 0.0),  # walk backward
 ]
 
 
