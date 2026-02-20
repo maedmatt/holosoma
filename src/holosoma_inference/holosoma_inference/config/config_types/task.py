@@ -63,3 +63,6 @@ class TaskConfig:
 
     motion_end_timestep: int | None = None
     """Ending timestep for motion clip playback. If None, plays until the end."""
+
+    use_scripted_path: bool = False
+    """Run a predefined velocity sequence for sim-vs-real comparison."""
