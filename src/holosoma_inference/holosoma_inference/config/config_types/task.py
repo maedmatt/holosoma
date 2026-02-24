@@ -63,3 +63,6 @@ class TaskConfig:
 
     motion_end_timestep: int | None = None
     """Ending timestep for motion clip playback. If None, plays until the end."""
+
+    replay_commands_path: str | None = None
+    """Path to parquet with velocity commands for replay ('joystick' column: FixedSizeList[3] of vx, vy, vyaw)."""

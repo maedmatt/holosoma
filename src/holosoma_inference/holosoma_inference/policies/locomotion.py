@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+from pathlib import Path
+from typing import override
+
 import numpy as np
 from termcolor import colored
 
@@ -8,6 +13,61 @@ class LocomotionPolicy(BasePolicy):
     def __init__(self, config):
         super().__init__(config)
         self.is_standing = False
+
+        # Velocity command replay
+        self._replay_commands: np.ndarray | None = None
+        self._replay_step: int = 0
+        self._replay_active: bool = False
+
+        if config.task.replay_commands_path is not None:
+            self._load_replay_commands(config.task.replay_commands_path)
+
+    def _load_replay_commands(self, path: str) -> None:
+        """Load velocity commands from parquet. Expects a 'joystick' column (FixedSizeList[3]: vx, vy, vyaw)."""
+        import pyarrow.parquet as pq
+
+        table = pq.read_table(Path(path), columns=["joystick"])
+        # FixedSizeList column: flatten to (N*3,) then reshape to (N, 3)
+        flat = table.column("joystick").combine_chunks().values.to_numpy(zero_copy_only=False)
+        self._replay_commands = flat.reshape(-1, 3).astype(np.float32)
+
+        n = len(self._replay_commands)
+        duration = n / self.rl_rate
+        self.logger.info(f"Loaded replay commands: {n} steps ({duration:.1f}s at {self.rl_rate} Hz) from {path}")
+
+    def _start_replay(self) -> None:
+        self._replay_active = True
+        self._replay_step = 0
+        self.logger.info(colored("Velocity replay started", "green"))
+
+    def _stop_replay(self, reason: str) -> None:
+        if not self._replay_active:
+            return
+        self._replay_active = False
+        self.lin_vel_command[0, 0] = 0.0
+        self.lin_vel_command[0, 1] = 0.0
+        self.ang_vel_command[0, 0] = 0.0
+        self.logger.info(colored(f"Velocity replay stopped ({reason})", "yellow"))
+
+    @override
+    def policy_action(self):
+        if self._replay_active and self._replay_commands is not None:
+            step = self._replay_step
+            total = len(self._replay_commands)
+
+            if step >= total:
+                self._stop_replay("completed")
+            else:
+                vx, vy, vyaw = self._replay_commands[step]
+                self.lin_vel_command[0, 0] = vx
+                self.lin_vel_command[0, 1] = vy
+                self.ang_vel_command[0, 0] = vyaw
+                self._replay_step += 1
+
+                if step % 50 == 0:
+                    self.logger.info(f"Replay step {step}/{total} (vx={vx:.2f}, vy={vy:.2f}, vyaw={vyaw:.2f})")
+
+        super().policy_action()
 
     def get_current_obs_buffer_dict(self, robot_state_data):
         current_obs_buffer_dict = super().get_current_obs_buffer_dict(robot_state_data)
@@ -59,6 +119,9 @@ class LocomotionPolicy(BasePolicy):
             self._handle_stand_command()
         elif keycode == "z":
             self._handle_zero_velocity()
+            self._stop_replay("aborted")
+        elif keycode == "p":
+            self._handle_replay_key()
 
         self._print_control_status()
 
@@ -112,6 +175,23 @@ class LocomotionPolicy(BasePolicy):
         self.lin_vel_command[0, 0] = 0.0
         self.lin_vel_command[0, 1] = 0.0
         self.logger.info(colored("Velocities set to zero", "blue"))
+
+    def _handle_replay_key(self) -> None:
+        """Start velocity replay if configured and preconditions are met."""
+        if self._replay_commands is None:
+            return
+        if not self.use_policy_action:
+            self.logger.warning("Start policy first (]) before replay")
+            return
+        if not self.stand_command[0, 0]:
+            self.logger.warning("Enable walk mode (=) before replay")
+            return
+        self._start_replay()
+
+    @override
+    def _handle_stop_policy(self):
+        self._stop_replay("aborted")
+        super()._handle_stop_policy()
 
     def _print_control_status(self):
         """Print current control status."""
