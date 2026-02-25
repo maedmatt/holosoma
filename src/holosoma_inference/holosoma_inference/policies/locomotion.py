@@ -26,14 +26,20 @@ class LocomotionPolicy(BasePolicy):
         """Load velocity commands from parquet. Expects a 'joystick' column (FixedSizeList[3]: vx, vy, vyaw)."""
         import pyarrow.parquet as pq
 
-        table = pq.read_table(Path(path), columns=["joystick"])
-        # FixedSizeList column: flatten to (N*3,) then reshape to (N, 3)
+        table = pq.read_table(Path(path), columns=["joystick", "joints.q"])
+
+        # Velocity commands: FixedSizeList[3] → (N, 3)
         flat = table.column("joystick").combine_chunks().values.to_numpy(zero_copy_only=False)
         self._replay_commands = flat.reshape(-1, 3).astype(np.float32)
+
+        # Starting pose for 'i' key init (separate from default_dof_angles used by policy actions)
+        q_flat = table.column("joints.q").combine_chunks().values.to_numpy(zero_copy_only=False)
+        self._replay_init_pose = q_flat.reshape(-1, self.num_dofs)[0].astype(np.float64)
 
         n = len(self._replay_commands)
         duration = n / self.rl_rate
         self.logger.info(f"Loaded replay commands: {n} steps ({duration:.1f}s at {self.rl_rate} Hz) from {path}")
+        self.logger.info("Initial pose loaded from parquet (press 'i' to apply)")
 
     def _start_replay(self) -> None:
         self._replay_active = True
@@ -48,6 +54,16 @@ class LocomotionPolicy(BasePolicy):
         self.lin_vel_command[0, 1] = 0.0
         self.ang_vel_command[0, 0] = 0.0
         self.logger.info(colored(f"Velocity replay stopped ({reason})", "yellow"))
+
+    @override
+    def get_init_target(self, robot_state_data):
+        """When replay parquet is loaded, 'i' interpolates to the recording's starting pose."""
+        if hasattr(self, "_replay_init_pose") and self.get_ready_state:
+            dof_pos = robot_state_data[:, 7 : 7 + self.num_dofs]
+            q_target = dof_pos + (self._replay_init_pose - dof_pos) * (self.init_count / 500)
+            self.init_count += 1
+            return q_target
+        return super().get_init_target(robot_state_data)
 
     @override
     def policy_action(self):
