@@ -5,8 +5,6 @@ The ``data`` field carries the flat observation vector whose layout
 depends on the active observation config.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 
 from cyclonedds.idl import IdlStruct
