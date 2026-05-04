@@ -22,6 +22,20 @@ class RecordingConfig:
 
 
 @dataclass(frozen=True)
+class NoisePredictorConfig:
+    """Settings for noise predictor during evaluation."""
+
+    enabled: bool = False
+    """Whether to enable noise prediction."""
+
+    checkpoint_path: str = ""
+    """Path to predictor checkpoint (.pt)."""
+
+    env_id: int = 0
+    """Environment ID to predict for."""
+
+
+@dataclass(frozen=True)
 class RecordingCallbackConfig:
     """Instantiation config for EvalRecordingCallback."""
 
@@ -30,6 +44,17 @@ class RecordingCallbackConfig:
 
     config: RecordingConfig = RecordingConfig()
     """Recording settings."""
+
+
+@dataclass(frozen=True)
+class NoisePredictorCallbackConfig:
+    """Instantiation config for NoisePredictorCallback."""
+
+    _target_: str = "holosoma.agents.callbacks.noise_predictor.NoisePredictorCallback"
+    """Class to instantiate."""
+
+    config: NoisePredictorConfig = NoisePredictorConfig()
+    """Noise predictor settings."""
 
 
 @dataclass(frozen=True)
@@ -42,6 +67,9 @@ class EvalCallbacksConfig:
 
     recording: RecordingCallbackConfig = RecordingCallbackConfig()
     """Trajectory recording callback."""
+
+    noise_predictor: NoisePredictorCallbackConfig = NoisePredictorCallbackConfig()
+    """Noise predictor callback."""
 
     def collect_active_callbacks(self) -> dict:
         """Collect callback configs where config.enabled is True."""
