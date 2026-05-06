@@ -808,19 +808,21 @@ class IsaacGym(BaseSimulator):
                 self.commands[:, 0] -= 0.1
                 logger.info(f"Current Command: {self.commands[:,]}")
             elif evt.action == "left_command" and evt.value > 0:
-                self.commands[:, 1] -= 0.1
-                logger.info(f"Current Command: {self.commands[:,]}")
-            elif evt.action == "right_command" and evt.value > 0:
                 self.commands[:, 1] += 0.1
                 logger.info(f"Current Command: {self.commands[:,]}")
+            elif evt.action == "right_command" and evt.value > 0:
+                self.commands[:, 1] -= 0.1
+                logger.info(f"Current Command: {self.commands[:,]}")
             elif evt.action == "heading_left_command" and evt.value > 0:
-                self.commands[:, 3] -= 0.1
+                idx = 3 if self.commands.shape[1] > 3 else 2
+                self.commands[:, idx] += 0.1
                 logger.info(f"Current Command: {self.commands[:,]}")
             elif evt.action == "heading_right_command" and evt.value > 0:
-                self.commands[:, 3] += 0.1
+                idx = 3 if self.commands.shape[1] > 3 else 2
+                self.commands[:, idx] -= 0.1
                 logger.info(f"Current Command: {self.commands[:,]}")
             elif evt.action == "zero_command" and evt.value > 0:
-                self.commands[:, :4] = 0
+                self.commands[:] = 0
                 logger.info(f"Current Command: {self.commands[:,]}")
             elif evt.action == "toggle_camera_tracking" and evt.value > 0:
                 was_enabled = self.simulator_config.viewer.enable_tracking
@@ -836,25 +838,29 @@ class IsaacGym(BaseSimulator):
                 status = "ON" if self.simulator_config.viewer.enable_tracking else "OFF"
                 logger.info(f"Camera tracking: {status}")
             elif evt.action == "push_robots" and evt.value > 0:
-                logger.info("Push Robots")
-                self._push_robots(torch.arange(self.num_envs, device=self.device))
+                logger.warning("Push robots not implemented in viewer, ignoring...")
             # elif evt.action == "next_task" and evt.value > 0:
             #     self.next_task()
             elif evt.action == "walk_stand_toggle" and evt.value > 0:
-                self.commands[:, 4] = 1 - self.commands[:, 4]
-                logger.info(f"Current Command: {self.commands[:,]}")
+                if self.commands.shape[1] > 4:
+                    self.commands[:, 4] = 1 - self.commands[:, 4]
+                    logger.info(f"Current Command: {self.commands[:,]}")
             elif evt.action == "height_up" and evt.value > 0:
-                self.commands[:, 8] += 0.1
-                logger.info(f"Current Command: {self.commands[:,]}")
+                if self.commands.shape[1] > 8:
+                    self.commands[:, 8] += 0.1
+                    logger.info(f"Current Command: {self.commands[:,]}")
             elif evt.action == "height_down" and evt.value > 0:
-                self.commands[:, 8] -= 0.1
-                logger.info(f"Current Command: {self.commands[:,]}")
+                if self.commands.shape[1] > 8:
+                    self.commands[:, 8] -= 0.1
+                    logger.info(f"Current Command: {self.commands[:,]}")
             elif evt.action == "waist_yaw_up" and evt.value > 0:
-                self.commands[:, 5] += 0.1
-                logger.info(f"Current Command: {self.commands[:,]}")
+                if self.commands.shape[1] > 5:
+                    self.commands[:, 5] += 0.1
+                    logger.info(f"Current Command: {self.commands[:,]}")
             elif evt.action == "waist_yaw_down" and evt.value > 0:
-                self.commands[:, 5] -= 0.1
-                logger.info(f"Current Command: {self.commands[:,]}")
+                if self.commands.shape[1] > 5:
+                    self.commands[:, 5] -= 0.1
+                    logger.info(f"Current Command: {self.commands[:,]}")
             elif evt.action == "vis_force_range" and evt.value > 0:
                 self.vis_force_range = 1 - self.vis_force_range
                 logger.info(f"Vis force range: {self.vis_force_range}")

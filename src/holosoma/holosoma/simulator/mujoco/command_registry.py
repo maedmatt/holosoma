@@ -30,8 +30,8 @@ class CommandRegistry:
             glfw.KEY_S: ("backward_command", lambda: self._adjust_command(0, -0.1)),
             glfw.KEY_A: ("left_command", lambda: self._adjust_command(1, -0.1)),
             glfw.KEY_D: ("right_command", lambda: self._adjust_command(1, 0.1)),
-            glfw.KEY_Q: ("heading_left_command", lambda: self._adjust_command(3, -0.1)),
-            glfw.KEY_E: ("heading_right_command", lambda: self._adjust_command(3, 0.1)),
+            glfw.KEY_Q: ("heading_left_command", lambda: self._adjust_command(self._yaw_index(), -0.1)),
+            glfw.KEY_E: ("heading_right_command", lambda: self._adjust_command(self._yaw_index(), 0.1)),
             glfw.KEY_Z: ("zero_command", lambda: self._zero_commands()),
             glfw.KEY_X: ("walk_stand_toggle", lambda: self._toggle_command(4)),
             glfw.KEY_U: ("height_up", lambda: self._adjust_command(8, 0.1)),
@@ -85,14 +85,23 @@ class CommandRegistry:
 
         return False
 
+    def _yaw_index(self) -> int:
+        """Yaw is index 3 on wide tensors (walk_stand layout) and 2 on narrow [vx, vy, vyaw]."""
+        return 3 if self.simulator.commands.shape[-1] > 3 else 2
+
     def _adjust_command(self, index: int, delta: float):
-        """Adjust command value by delta."""
+        """Adjust command value by delta. No-op if index is out of range (narrow tensors)."""
+        if index >= self.simulator.commands.shape[-1]:
+            return
         self.simulator.commands[:, index] += delta
 
     def _toggle_command(self, index: int):
-        """Toggle command value between 0 and 1."""
+        """Toggle command value between 0 and 1. No-op if index is out of range."""
+        if index >= self.simulator.commands.shape[-1]:
+            return
         self.simulator.commands[:, index] = 1 - self.simulator.commands[:, index]
 
     def _zero_commands(self):
         """Zero out movement commands."""
-        self.simulator.commands[:, :4] = 0
+        width = min(4, self.simulator.commands.shape[-1])
+        self.simulator.commands[:, :width] = 0
