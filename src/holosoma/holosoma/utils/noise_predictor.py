@@ -127,10 +127,13 @@ class NoisePredictor:
     def predict(self, env: Any, env_id: int) -> Tensor | None:
         """Append the current base feature row, then forward if the buffer is full."""
         sim = env.simulator
+        # Mirror the locosonic recorder's 0.1 stick deadzone so cmd stays in
+        # the same distribution the predictor was trained on.
+        cmd = env.command_manager.commands[env_id]
         sources = {
             "dof_pos": sim.dof_pos[env_id],
             "dof_vel": sim.dof_vel[env_id],
-            "cmd": env.command_manager.commands[env_id],
+            "cmd": cmd * (cmd.abs() > 0.1),
         }
         row = torch.empty(self._n_base, device=self.device)
         for src, (dst, src_idx) in self._gather.items():
