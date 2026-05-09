@@ -3,6 +3,8 @@
 from holosoma.config_values.loco.g1.reward import (
     g1_23dof_loco,
     g1_23dof_loco_fast_sac,
+    g1_23dof_loco_quiet,
+    g1_23dof_loco_quiet_fast_sac,
     g1_29dof_loco,
     g1_29dof_loco_fast_sac,
 )
@@ -21,6 +23,8 @@ DEFAULTS = {
     "t1_29dof_loco_fast_sac": t1_29dof_loco_fast_sac,
     "g1_23dof_loco": g1_23dof_loco,
     "g1_23dof_loco_fast_sac": g1_23dof_loco_fast_sac,
+    "g1_23dof_loco_quiet": g1_23dof_loco_quiet,
+    "g1_23dof_loco_quiet_fast_sac": g1_23dof_loco_quiet_fast_sac,
     "g1_29dof_loco": g1_29dof_loco,
     "g1_29dof_loco_fast_sac": g1_29dof_loco_fast_sac,
     "g1_29dof_wbt": g1_29dof_wbt_reward,
