@@ -522,7 +522,8 @@ class BaseTask:
     def _check_termination(self):
         self.reset_buf[:] = 0
         self.time_out_buf[:] = 0
-        if self.termination_manager is None:
+        if self.termination_manager is None or self.is_evaluating:
+            # No resets during eval, so failures stay visible in the rollout.
             return
 
         reset_flags, timeout_flags = self.termination_manager.check()
