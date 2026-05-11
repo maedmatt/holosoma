@@ -58,6 +58,25 @@ class NoisePredictorCallbackConfig:
 
 
 @dataclass(frozen=True)
+class PolicyEvalConfig:
+    """Settings for scripted policy evaluation."""
+
+    enabled: bool = False
+    """Whether to enable scripted policy evaluation (drives commands from SCHEDULE)."""
+
+
+@dataclass(frozen=True)
+class PolicyEvalCallbackConfig:
+    """Instantiation config for PolicyEvalCallback."""
+
+    _target_: str = "holosoma.agents.callbacks.policy_eval.PolicyEvalCallback"
+    """Class to instantiate."""
+
+    config: PolicyEvalConfig = PolicyEvalConfig()
+    """Scripted policy evaluation settings."""
+
+
+@dataclass(frozen=True)
 class EvalCallbacksConfig:
     """Container for all eval callback configs.
 
@@ -70,6 +89,9 @@ class EvalCallbacksConfig:
 
     noise_predictor: NoisePredictorCallbackConfig = NoisePredictorCallbackConfig()
     """Noise predictor callback."""
+
+    policy_eval: PolicyEvalCallbackConfig = PolicyEvalCallbackConfig()
+    """Scripted policy evaluation callback."""
 
     def collect_active_callbacks(self) -> dict:
         """Collect callback configs where config.enabled is True."""

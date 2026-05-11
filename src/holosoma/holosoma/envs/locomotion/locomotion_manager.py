@@ -272,6 +272,10 @@ class LeggedRobotLocomotionManager(BaseTask):
         if target_state is not None:
             self.simulator.dof_pos[env_ids] = target_state[..., 0]
             self.simulator.dof_vel[env_ids] = target_state[..., 1]
+        elif self.is_evaluating:
+            # Clean reset for eval: exact default pose, zero velocity.
+            self.simulator.dof_pos[env_ids] = self.default_dof_pos[env_ids]
+            self.simulator.dof_vel[env_ids] = 0.0
         else:
             self.simulator.dof_pos[env_ids] = self.default_dof_pos[env_ids] * torch_rand_float(
                 0.5, 1.5, (len(env_ids), self.num_dof), device=str(self.device)
@@ -330,7 +334,11 @@ class LeggedRobotLocomotionManager(BaseTask):
                     # FAST: Original simple spawning - just apply XY offset, keep original Z (faster, for flat terrain)
                     self.simulator.robot_root_states[env_ids, :2] += xy_offsets
 
-            # base velocities
-            self.simulator.robot_root_states[env_ids, 7:13] = torch_rand_float(
-                -0.5, 0.5, (len(env_ids), 6), device=str(self.device)
-            )  # [7:10]: lin vel, [10:13]: ang vel
+            # base velocities — zero at eval so the rollout starts from rest;
+            # otherwise sample a small kick to widen the training distribution.
+            if self.is_evaluating:
+                self.simulator.robot_root_states[env_ids, 7:13] = 0.0
+            else:
+                self.simulator.robot_root_states[env_ids, 7:13] = torch_rand_float(
+                    -0.5, 0.5, (len(env_ids), 6), device=str(self.device)
+                )  # [7:10]: lin vel, [10:13]: ang vel

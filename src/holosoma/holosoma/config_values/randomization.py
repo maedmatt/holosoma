@@ -1,10 +1,14 @@
 """Default randomization manager configurations."""
 
+from holosoma.config_types.randomization import RandomizationManagerCfg
 from holosoma.config_values.loco.g1.randomization import g1_29dof_randomization
 from holosoma.config_values.loco.t1.randomization import t1_29dof_randomization
 from holosoma.config_values.wbt.g1.randomization import g1_29dof_wbt_randomization, g1_29dof_wbt_randomization_w_object
 
-none = None
+# Empty preset: no setup/reset/step randomization terms. Combined with the
+# is_evaluating gates in obs noise and reset-state randomization, this gives a
+# fully deterministic rollout for policy comparison.
+none = RandomizationManagerCfg()
 
 DEFAULTS = {
     "none": none,
