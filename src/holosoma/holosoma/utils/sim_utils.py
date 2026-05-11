@@ -111,8 +111,14 @@ def setup_isaaclab_launcher(config: ExperimentConfig | RunSimConfig, device: str
     return simulation_app
 
 
-def setup_keyboard_listener(env) -> threading.Thread:
+def setup_keyboard_listener(env) -> threading.Thread | None:
     """Setup keyboard listener thread for simulation control.
+
+    Returns None on macOS: pynput's keyboard.Listener uses CGEventTap, which
+    requires the main thread. Under mjpython (whose Cocoa run loop owns the
+    main thread) the daemon-thread Listener crashes with SIGTRAP. The MuJoCo
+    viewer's own key callback already covers all policy/walk controls; the
+    pynput listener only added `n`/`1`/`2`, which aren't needed in eval.
 
     Parameters
     ----------
@@ -121,9 +127,13 @@ def setup_keyboard_listener(env) -> threading.Thread:
 
     Returns
     -------
-    threading.Thread
-        Keyboard listener thread (already started).
+    threading.Thread | None
+        Keyboard listener thread (already started), or None on macOS.
     """
+    if sys.platform == "darwin":
+        logger.info("Skipping pynput keyboard listener on macOS (mjpython conflict). Use the MuJoCo viewer's key callback.")
+        return None
+
 
     def on_press(key, env):
         """Handle keyboard input for simulation control."""
