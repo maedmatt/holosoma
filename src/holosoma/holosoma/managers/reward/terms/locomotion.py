@@ -6,7 +6,8 @@ compatible with the reward manager system.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import os
+from typing import TYPE_CHECKING, Any
 
 from holosoma.managers.observation.terms.locomotion import (
     base_forward_vector,
@@ -15,14 +16,18 @@ from holosoma.managers.observation.terms.locomotion import (
     get_projected_gravity,
     gravity_vector,
 )
+from holosoma.managers.reward.base import RewardTermBase
+from holosoma.utils.noise_predictor import BatchedNoisePredictor
 from holosoma.utils.rotations import (
     quat_apply,
     quat_rotate_batched,
     quat_rotate_inverse,
 )
 from holosoma.utils.safe_torch_import import torch
+from holosoma.utils.touchdown import TouchdownDetector
 
 if TYPE_CHECKING:
+    from holosoma.config_types.reward import RewardTermCfg
     from holosoma.envs.locomotion.locomotion_manager import LeggedRobotLocomotionManager
 
 
@@ -130,6 +135,39 @@ def penalty_feet_velocity(env: LeggedRobotLocomotionManager) -> torch.Tensor:
     """
     foot_vel = env.simulator._rigid_body_vel[:, env.feet_indices, :]
     return torch.sum(foot_vel.square(), dim=(1, 2))
+
+
+class NoisePredictorPenalty(RewardTermBase):
+    """Predicted-loudness penalty, fired only on detected foot touchdowns.
+
+    The locosonic predictor was trained on touchdown-windowed inputs, so we
+    only emit a signal on touchdown events and gate by an upright check
+    (base height + projected gravity) to stay in distribution. Returns 0
+    between impacts. Checkpoint path comes from $HOLOSOMA_NOISE_PREDICTOR_CKPT.
+    """
+
+    _BASE_Z_MIN = 0.65
+    _GRAV_Z_MAX = -0.95
+
+    def __init__(self, cfg: RewardTermCfg, env: Any) -> None:
+        super().__init__(cfg, env)
+        ckpt = os.environ["HOLOSOMA_NOISE_PREDICTOR_CKPT"]
+        self._predictor = BatchedNoisePredictor(ckpt, num_envs=env.num_envs, device=env.device)
+        self._detector = TouchdownDetector(num_envs=env.num_envs, num_feet=len(env.feet_indices))
+
+    def reset(self, env_ids: torch.Tensor | None = None) -> None:
+        self._predictor.reset(env_ids)
+        self._detector.reset(env_ids)
+
+    def __call__(self, env: Any, **kwargs: Any) -> torch.Tensor:
+        ready = self._predictor.update_buffer(env)
+        vz = env.simulator._rigid_body_vel[:, env.feet_indices, 2]
+        fz = env.simulator.contact_forces[:, env.feet_indices, 2]
+        fired = self._detector.step(vz, fz).any(dim=1)
+        base_z = env.simulator.robot_root_states[:, 2]
+        upright = (base_z > self._BASE_Z_MIN) & (get_projected_gravity(env)[:, 2] < self._GRAV_Z_MAX)
+        gate = ready & fired & upright
+        return self._predictor.forward()[:, 0].clamp(min=0.0) * gate.float()
 
 
 # ================================================================================================
