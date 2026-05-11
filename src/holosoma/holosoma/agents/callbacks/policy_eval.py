@@ -18,20 +18,19 @@ from holosoma.utils.timeseries_log import TimeseriesLogger
 
 
 # (duration_s, vx, vy, vyaw)
+# Translation-only schedule with idle stops between motions. Yaw is excluded
+# because MuJoCo's plane friction (mu=1.0) saturates during sustained yaw and
+# the stance foot slips, which is not representative of real-robot behavior.
 SCHEDULE: list[tuple[float, float, float, float]] = [
     (3.0, 0.0, 0.0, 0.0),    # settle
     (5.0, 0.5, 0.0, 0.0),    # forward
-    (2.0, 0.0, 0.0, 0.0),
+    (2.0, 0.0, 0.0, 0.0),    # stop
     (5.0, -0.4, 0.0, 0.0),   # backward
-    (2.0, 0.0, 0.0, 0.0),
+    (2.0, 0.0, 0.0, 0.0),    # stop
     (5.0, 0.0, 0.3, 0.0),    # left strafe
-    (2.0, 0.0, 0.0, 0.0),
+    (2.0, 0.0, 0.0, 0.0),    # stop
     (5.0, 0.0, -0.3, 0.0),   # right strafe
-    (2.0, 0.0, 0.0, 0.0),
-    (5.0, 0.0, 0.0, 0.6),    # yaw +
-    (2.0, 0.0, 0.0, 0.0),
-    (5.0, 0.0, 0.0, -0.6),   # yaw -
-    (3.0, 0.0, 0.0, 0.0),    # settle
+    (3.0, 0.0, 0.0, 0.0),    # final settle
 ]
 
 OUTPUT_NAME = "policy_eval.npz"
@@ -102,6 +101,7 @@ class PolicyEvalCallback(RLEvalCallback):
         self._prev_foot_vel = foot_vel.clone()
 
         root = env.simulator.robot_root_states[ENV_ID]
+        gait = env.command_manager.get_state("locomotion_gait")
 
         self._log.append(
             t=self._step / POLICY_HZ,
@@ -114,6 +114,10 @@ class PolicyEvalCallback(RLEvalCallback):
             base_quat=root[3:7],
             base_lin_vel=root[7:10],
             base_ang_vel=root[10:13],
+            dof_pos=env.simulator.dof_pos[ENV_ID],
+            dof_vel=env.simulator.dof_vel[ENV_ID],
+            gait_phase=gait.phase[ENV_ID],
+            action=actor_state["actions"][ENV_ID],
         )
 
         self._step += 1
