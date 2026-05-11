@@ -7,6 +7,7 @@ implementations for terrain rendering, contact detection, and physics simulation
 from __future__ import annotations
 
 import dataclasses
+import time
 
 import mujoco
 import mujoco.viewer
@@ -1372,6 +1373,19 @@ class MuJoCo(BaseSimulator):
         if self.debug_viz_enabled:
             self.clear_lines()
             self.draw_debug_viz()
+
+        # Pace to wall-clock so interactive eval runs at real-time instead of
+        # as-fast-as-CPU. Only active when a viewer exists (training and
+        # headless eval never get here, so they are unaffected).
+        target_dt = self.simulator_config.sim.control_decimation * self.sim_dt
+        now = time.perf_counter()
+        deadline = getattr(self, "_viewer_pace_deadline", now) + target_dt
+        sleep = deadline - now
+        if sleep > 0:
+            time.sleep(sleep)
+            self._viewer_pace_deadline = deadline
+        else:
+            self._viewer_pace_deadline = now
 
     def time(self) -> float:
         """Get current simulation time in seconds.

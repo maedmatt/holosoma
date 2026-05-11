@@ -124,8 +124,8 @@ class NoisePredictor:
 
         logger.info(f"Noise predictor: {n_base} base features × {n_steps} steps = {len(names)} inputs")
 
-    def predict(self, env: Any, env_id: int) -> Tensor | None:
-        """Append the current base feature row, then forward if the buffer is full."""
+    def update_buffer(self, env: Any, env_id: int) -> bool:
+        """Append current base features to the rolling buffer. Returns True once full."""
         sim = env.simulator
         # Mirror the locosonic recorder's 0.1 stick deadzone so cmd stays in
         # the same distribution the predictor was trained on.
@@ -139,10 +139,10 @@ class NoisePredictor:
         for src, (dst, src_idx) in self._gather.items():
             row[dst] = sources[src][src_idx]
         self._buffer.append(row)
+        return len(self._buffer) >= self._n_steps
 
-        if len(self._buffer) < self._n_steps:
-            return None
-
+    def forward(self) -> Tensor:
+        """Run the model on the current buffer. Caller must ensure buffer is full."""
         # Stack [n_steps, n_base] -> transpose -> flatten matches locosonic's
         # [feat0@t-k, ..., feat0@t, feat1@t-k, ...] packing.
         x = torch.stack(list(self._buffer)).T.reshape(-1).unsqueeze(0)
