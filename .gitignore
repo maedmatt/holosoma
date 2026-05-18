@@ -29,3 +29,4 @@ src/holosoma/holosoma/data/robots/converted_rank*/
 *.egg-info
 __pycache__
 .claude
+data/
