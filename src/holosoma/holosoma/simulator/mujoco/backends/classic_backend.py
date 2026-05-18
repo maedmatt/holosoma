@@ -119,11 +119,17 @@ class ClassicBackend(IMujocoBackend):
         for i in range(self.data.ncon):
             contact = self.data.contact[i]
 
-            # Get 6D force/torque vector
+            # Get 6D force/torque vector. mj_contactForce returns the force in the
+            # contact frame: index 0 is the normal component (along the contact normal,
+            # pointing from geom1 to geom2), indices 1 and 2 are the two tangential
+            # (friction) components. Rotate into world frame using contact.frame, whose
+            # rows are the contact-frame basis vectors expressed in world coordinates.
             mujoco.mj_contactForce(self.model, self.data, i, forcetorque)
+            frame = np.asarray(contact.frame).reshape(3, 3)
+            force_world = frame.T @ forcetorque[:3]
 
             # Convert to torch tensor (forces only, ignore torques)
-            force = torch.from_numpy(forcetorque[:3]).float().to(self.device)
+            force = torch.from_numpy(force_world).float().to(self.device)
 
             # Map geoms to bodies
             b1 = self.model.geom_bodyid[contact.geom1]
