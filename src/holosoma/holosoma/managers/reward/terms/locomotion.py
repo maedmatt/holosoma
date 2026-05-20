@@ -167,7 +167,15 @@ class NoisePredictorPenalty(RewardTermBase):
         base_z = env.simulator.robot_root_states[:, 2]
         upright = (base_z > self._BASE_Z_MIN) & (get_projected_gravity(env)[:, 2] < self._GRAV_Z_MAX)
         gate = ready & fired & upright
-        return self._predictor.forward()[:, 0].clamp(min=0.0) * gate.float()
+        raw_out = self._predictor.forward()[:, 0]
+
+        env.log_dict["noise/raw_out_mean"] = raw_out.mean()
+        env.log_dict["noise/raw_out_std"] = raw_out.std()
+        env.log_dict["noise/neg_rate"] = (raw_out < 0).float().mean()
+        env.log_dict["noise/gate_rate"] = gate.float().mean()
+        env.log_dict["noise/upright_rate"] = upright.float().mean()
+
+        return raw_out.clamp(min=0.0) * gate.float()
 
 
 # ================================================================================================
