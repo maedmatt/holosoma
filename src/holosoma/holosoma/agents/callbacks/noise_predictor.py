@@ -131,7 +131,7 @@ class NoisePredictorCallback(RLEvalCallback):
 
     def on_pre_evaluate_policy(self) -> None:
         self._predictor = NoisePredictor(self.checkpoint_path, device=self.device)
-        self._detector = TouchdownDetector(num_envs=1, num_feet=2, algo="hybrid")
+        self._detector = TouchdownDetector(num_envs=1, num_feet=2)
         logger.info(f"Noise predictor loaded from {self.checkpoint_path}")
         self._log.clear()
         self._n_impacts = 0
