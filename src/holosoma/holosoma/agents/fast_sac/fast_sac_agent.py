@@ -1029,6 +1029,12 @@ class FastSACAgent(BaseAlgo):
             actor_state["obs"] = obs
             actor_state = self._post_eval_env_step(actor_state)
 
+            # An eval callback can ask for a reset between scenarios so the
+            # next action is computed from the fresh obs rather than stale
+            # end-of-scenario state.
+            if actor_state.get("eval_reset_request", False):
+                obs = self.env.reset()
+
         self._post_evaluate_policy()
 
     def _create_eval_callbacks(self):
