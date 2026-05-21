@@ -25,7 +25,7 @@ class TouchdownDetector:
         num_feet: int = 2,
         *,
         vz_arm_thr: float = 0.3,
-        fz_fire_thr: float = 1.0,
+        fz_fire_thr: float = 1.0,  # 1 N matches legged_gym (PhysX mesh-contact noise floor)
     ) -> None:
         """
         vz_arm_thr:  |vz| in m/s required to arm a descent.
