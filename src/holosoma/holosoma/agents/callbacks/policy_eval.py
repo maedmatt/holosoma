@@ -32,7 +32,7 @@ from holosoma.utils.timeseries_log import TimeseriesLogger
 
 
 SETTLE_S = 1.0  # idle bracket before and after each scenario's active window
-ACTIVE_S = 5.0  # duration of the velocity command in each scenario
+ACTIVE_S = 30.0  # duration of the velocity command in each scenario
 
 ENV_ID = 0
 OUTPUT_DIR = "policy_eval"
@@ -51,10 +51,16 @@ class Scenario:
 
 
 SCHEDULE: list[Scenario] = [
-    Scenario(name="forward",      vx= 0.5, vy= 0.0, vyaw=0.0),
-    Scenario(name="backward",     vx=-0.4, vy= 0.0, vyaw=0.0),
-    Scenario(name="strafe_left",  vx= 0.0, vy= 0.3, vyaw=0.0),
-    Scenario(name="strafe_right", vx= 0.0, vy=-0.3, vyaw=0.0),
+    Scenario(name="forward_03",   vx= 0.3, vy= 0.0, vyaw= 0.0),
+    Scenario(name="forward_06",   vx= 0.6, vy= 0.0, vyaw= 0.0),
+    Scenario(name="forward_09",   vx= 0.9, vy= 0.0, vyaw= 0.0),
+    Scenario(name="backward_03",  vx=-0.3, vy= 0.0, vyaw= 0.0),
+    Scenario(name="backward_06",  vx=-0.6, vy= 0.0, vyaw= 0.0),
+    Scenario(name="backward_09",  vx=-0.9, vy= 0.0, vyaw= 0.0),
+    Scenario(name="strafe_left",  vx= 0.0, vy= 0.3, vyaw= 0.0),
+    Scenario(name="strafe_right", vx= 0.0, vy=-0.3, vyaw= 0.0),
+    Scenario(name="yaw_left",     vx= 0.0, vy= 0.0, vyaw= 0.5),
+    Scenario(name="yaw_right",    vx= 0.0, vy= 0.0, vyaw=-0.5),
 ]
 
 
@@ -66,6 +72,7 @@ class PolicyEvalCallback(RLEvalCallback):
         self._scenario_idx = 0
         self._step_in_scenario = 0
         self._log = TimeseriesLogger()
+        self._log_hi = TimeseriesLogger()  # 200 Hz substep stream; populated only when sim flag is on
         self._prev_foot_vel: torch.Tensor | None = None
         self._out_dir: Path | None = None
         # Derived from env.dt at the start of evaluation.
@@ -73,6 +80,9 @@ class PolicyEvalCallback(RLEvalCallback):
         self._settle_steps = 0
         self._active_steps = 0
         self._scenario_steps = 0
+        self._highrate_enabled = False
+        self._sim_dt = 0.0
+        self._decimation = 0
 
     def _env(self):
         return self.training_loop._unwrap_env()
@@ -88,6 +98,7 @@ class PolicyEvalCallback(RLEvalCallback):
         self._scenario_idx = 0
         self._step_in_scenario = 0
         self._log.clear()
+        self._log_hi.clear()
         self._prev_foot_vel = None
 
         self._dt = self._env().dt
@@ -95,6 +106,11 @@ class PolicyEvalCallback(RLEvalCallback):
         self._active_steps = int(round(ACTIVE_S / self._dt))
         self._scenario_steps = self._settle_steps + self._active_steps + self._settle_steps
         total_steps = self._scenario_steps * len(SCHEDULE)
+
+        sim_cfg = self._env().simulator.simulator_config
+        self._highrate_enabled = getattr(sim_cfg, "highrate_logging_enabled", False)
+        self._sim_dt = self._env().simulator.sim_dt
+        self._decimation = sim_cfg.sim.control_decimation
 
         self._out_dir = Path(self.training_loop.log_dir) / OUTPUT_DIR
         self._out_dir.mkdir(parents=True, exist_ok=True)
@@ -108,6 +124,9 @@ class PolicyEvalCallback(RLEvalCallback):
         )
 
     def on_pre_eval_env_step(self, actor_state: dict) -> dict:
+        # Eval loop may run longer than the schedule; stop driving commands when done.
+        if self._scenario_idx >= len(SCHEDULE):
+            return actor_state
         scenario = self._scenario()
         if self._is_active_step():
             vx, vy, vyaw = scenario.vx, scenario.vy, scenario.vyaw
@@ -126,6 +145,8 @@ class PolicyEvalCallback(RLEvalCallback):
             return actor_state
 
         self._log_step(actor_state)
+        if self._highrate_enabled:
+            self._log_step_hi(actor_state)
         self._step_in_scenario += 1
 
         if self._step_in_scenario >= self._scenario_steps:
@@ -134,6 +155,7 @@ class PolicyEvalCallback(RLEvalCallback):
             self._step_in_scenario = 0
             self._prev_foot_vel = None
             self._log.clear()
+            self._log_hi.clear()
             # Ask the eval loop to reset so the next scenario starts from
             # the same pose as every other scenario.
             if self._scenario_idx < len(SCHEDULE):
@@ -175,6 +197,35 @@ class PolicyEvalCallback(RLEvalCallback):
             action=actor_state["actions"][ENV_ID],
         )
 
+    def _log_step_hi(self, actor_state: dict) -> None:
+        """Append decimation rows (one per physics substep) to the 200 Hz logger.
+        Reads per-substep buffers populated by the IsaacGym simulator. Fields that
+        are 50 Hz by construction (cmd, action, is_active) are repeated for each row."""
+        env = self._env()
+        sim = env.simulator
+        cmd = env.command_manager.commands[ENV_ID]
+        action = actor_state["actions"][ENV_ID]
+        is_active = self._is_active_step()
+        t0 = self._step_in_scenario * self._dt
+
+        rb_vel = sim._rb_vel_substep[ENV_ID]   # [dec, num_bodies, 3]
+        cf = sim._contact_substep[ENV_ID]      # [dec, num_bodies, 3]
+        root = sim._root_substep[ENV_ID]       # [dec, 13]
+
+        for k in range(self._decimation):
+            self._log_hi.append(
+                t=t0 + k * self._sim_dt,
+                is_active=is_active,
+                cmd=cmd,
+                foot_vel=rb_vel[k, env.feet_indices, :],
+                foot_force=cf[k, env.feet_indices, :],
+                base_pos=root[k, :3],
+                base_quat=root[k, 3:7],
+                base_lin_vel=root[k, 7:10],
+                base_ang_vel=root[k, 10:13],
+                action=action,
+            )
+
     def _dump_scenario(self) -> None:
         scenario = self._scenario()
         out_path = self._out_dir / f"scenario_{self._scenario_idx:02d}_{scenario.name}.npz"
@@ -183,6 +234,13 @@ class PolicyEvalCallback(RLEvalCallback):
             f"[policy_eval] saved scenario {self._scenario_idx} ({scenario.name}): "
             f"{n} steps to {out_path}"
         )
+        if self._highrate_enabled and len(self._log_hi) > 0:
+            hi_path = self._out_dir / f"scenario_{self._scenario_idx:02d}_{scenario.name}_200hz.npz"
+            n_hi = self._log_hi.save(hi_path)
+            logger.info(
+                f"[policy_eval] saved scenario {self._scenario_idx} ({scenario.name}) 200Hz: "
+                f"{n_hi} rows to {hi_path}"
+            )
 
     def _write_manifest(self) -> None:
         manifest = {
@@ -191,6 +249,12 @@ class PolicyEvalCallback(RLEvalCallback):
             "policy_hz": 1.0 / self._dt,
             "settle_s": SETTLE_S,
             "active_s": ACTIVE_S,
+            "highrate_enabled": self._highrate_enabled,
+            "sim_hz": (1.0 / self._sim_dt) if self._highrate_enabled else None,
+            "decimation": self._decimation if self._highrate_enabled else None,
+            # 50 Hz row at step N and 200 Hz row at index N*decimation + (decimation-1)
+            # describe the same post-decimation state, modulo float precision. Useful
+            # as a cross-check.
             "scenarios": [
                 {
                     "index": i,

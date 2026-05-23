@@ -640,6 +640,15 @@ class IsaacGym(BaseSimulator):
         # (num_envs, history_length, num_bodies, xyz axis), the first index is the most recent
         self.contact_forces_history[:, 0, :, :] = self.contact_forces.clone()  # deep copy
 
+        # Per-substep state buffers for eval-time 200 Hz logging (off by default).
+        # Sized to control_decimation so one policy step fills the buffer exactly.
+        if self.simulator_config.highrate_logging_enabled:
+            dec = self.simulator_config.sim.control_decimation
+            self._rb_vel_substep = torch.zeros(self.num_envs, dec, self.num_bodies, 3, device=self.device)
+            self._contact_substep = torch.zeros(self.num_envs, dec, self.num_bodies, 3, device=self.device)
+            self._root_substep = torch.zeros(self.num_envs, dec, 13, device=self.device)
+            self._substep_write_idx = 0
+
         # Initialize acceleration tensors ONLY if bridge is enabled
         if self.simulator_config.bridge.enabled:
             self.dof_acc = torch.zeros(self.num_envs, self.num_dof, device=self.device)
@@ -719,10 +728,27 @@ class IsaacGym(BaseSimulator):
 
         # refresh force sensor tensor at each physics step (0.005s)
         self.gym.refresh_force_sensor_tensor(self.sim)
+        # Bug fix for contact_forces_history (consumed only by wbt's UndesiredContacts):
+        # the force_sensor refresh above does not also refresh net contact forces, so
+        # the per-substep shift below was archiving stale duplicates. Locomotion is unaffected.
+        self.gym.refresh_net_contact_force_tensor(self.sim)
         if hasattr(self, "contact_forces_history") and hasattr(self, "contact_forces"):
             self.contact_forces_history = torch.cat(
                 [self.contact_forces.clone().unsqueeze(1), self.contact_forces_history[:, :-1, :, :]], dim=1
             )
+
+        # Per-substep state capture for eval-time 200 Hz logging.
+        # contact_forces is already fresh from the refresh above; only rigid_body and
+        # root_state need pulling. Buffer fills in chronological order (idx 0 = first
+        # substep of the policy step, idx dec-1 = last).
+        if self.simulator_config.highrate_logging_enabled:
+            self.gym.refresh_rigid_body_state_tensor(self.sim)
+            self.gym.refresh_actor_root_state_tensor(self.sim)
+            i = self._substep_write_idx
+            self._rb_vel_substep[:, i] = self._rigid_body_vel
+            self._contact_substep[:, i] = self.contact_forces
+            self._root_substep[:, i] = self.robot_root_states
+            self._substep_write_idx = (i + 1) % self.simulator_config.sim.control_decimation
 
         self.step_counter += 1
 
