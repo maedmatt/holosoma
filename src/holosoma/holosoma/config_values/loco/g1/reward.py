@@ -371,7 +371,7 @@ g1_29dof_loco_fast_sac = RewardManagerCfg(
 _penalty_noise = RewardTermCfg(
     func="holosoma.managers.reward.terms.locomotion:NoisePredictorPenalty",
     weight=-600.0,
-    params={},
+    params={"noise_predictor_ckpt": ""},  # required, override on CLI
     tags=["penalty_curriculum"],
 )
 

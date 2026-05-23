@@ -6,7 +6,6 @@ compatible with the reward manager system.
 
 from __future__ import annotations
 
-import os
 from typing import TYPE_CHECKING, Any
 
 from holosoma.managers.observation.terms.locomotion import (
@@ -141,17 +140,13 @@ class NoisePredictorPenalty(RewardTermBase):
     """Predicted-loudness penalty, fired only on detected foot touchdowns.
 
     The locosonic predictor was trained on touchdown-windowed inputs, so we
-    only emit a signal on touchdown events and gate by an upright check
-    (base height + projected gravity) to stay in distribution. Returns 0
-    between impacts. Checkpoint path comes from $HOLOSOMA_NOISE_PREDICTOR_CKPT.
+    only emit a signal on touchdown events. Returns 0 between impacts.
+    Checkpoint path: cfg.params["noise_predictor_ckpt"].
     """
-
-    _BASE_Z_MIN = 0.65
-    _GRAV_Z_MAX = -0.95
 
     def __init__(self, cfg: RewardTermCfg, env: Any) -> None:
         super().__init__(cfg, env)
-        ckpt = os.environ["HOLOSOMA_NOISE_PREDICTOR_CKPT"]
+        ckpt = cfg.params["noise_predictor_ckpt"]
         self._predictor = BatchedNoisePredictor(ckpt, num_envs=env.num_envs, device=env.device)
         self._detector = TouchdownDetector(num_envs=env.num_envs, num_feet=len(env.feet_indices))
 
@@ -164,16 +159,13 @@ class NoisePredictorPenalty(RewardTermBase):
         vz = env.simulator._rigid_body_vel[:, env.feet_indices, 2]
         fz = env.simulator.contact_forces[:, env.feet_indices, 2]
         fired = self._detector.step(vz, fz).any(dim=1)
-        base_z = env.simulator.robot_root_states[:, 2]
-        upright = (base_z > self._BASE_Z_MIN) & (get_projected_gravity(env)[:, 2] < self._GRAV_Z_MAX)
-        gate = ready & fired & upright
+        gate = ready & fired
         raw_out = self._predictor.forward()[:, 0]
 
         env.log_dict["noise/raw_out_mean"] = raw_out.mean()
         env.log_dict["noise/raw_out_std"] = raw_out.std()
         env.log_dict["noise/neg_rate"] = (raw_out < 0).float().mean()
         env.log_dict["noise/gate_rate"] = gate.float().mean()
-        env.log_dict["noise/upright_rate"] = upright.float().mean()
 
         return raw_out.clamp(min=0.0) * gate.float()
 
