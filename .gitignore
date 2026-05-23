@@ -19,7 +19,10 @@ Thumbs.db
 # Experiment logs
 logs
 logs_eval
-models/
+models/*
+!models/v11_sim_no_cmd_all36/
+models/v11_sim_no_cmd_all36/*
+!models/v11_sim_no_cmd_all36/best.pt
 
 # Isaacsim Converted Files
 src/holosoma/holosoma/data/robots/converted/
