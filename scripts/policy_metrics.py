@@ -25,6 +25,23 @@ import tyro
 # 12 substeps = 60 ms at 200 Hz. The fz peak can land several substeps after the touchdown firing instant.
 _FZ_PEAK_WINDOW = 12
 
+# Reference run for delta-vs-baseline plots in the wandb log. Regenerate by running this script
+# on a fresh baseline policy_eval directory and copying its avg/per-scenario numbers in.
+_BASELINE_NAME = "fastsac_g1_23dof_mode_4"
+_BASELINE = {
+    "forward_03":   {"vxy_rmse": 0.1802, "vyaw_rmse": 0.0823, "touchdown_vz_peak": 0.8957, "touchdown_vz_rms": 0.8235, "fz_peak_at_touchdown_mean": 1018.92, "action_rate_rms": 20.9532, "body_accel_rms": 3.8849},
+    "forward_06":   {"vxy_rmse": 0.2226, "vyaw_rmse": 0.1147, "touchdown_vz_peak": 0.9340, "touchdown_vz_rms": 0.8509, "fz_peak_at_touchdown_mean": 1054.03, "action_rate_rms": 22.3073, "body_accel_rms": 4.5682},
+    "forward_09":   {"vxy_rmse": 0.3153, "vyaw_rmse": 0.1348, "touchdown_vz_peak": 0.9761, "touchdown_vz_rms": 0.8682, "fz_peak_at_touchdown_mean":  939.08, "action_rate_rms": 24.3741, "body_accel_rms": 5.1376},
+    "backward_03":  {"vxy_rmse": 0.1427, "vyaw_rmse": 0.1044, "touchdown_vz_peak": 1.1036, "touchdown_vz_rms": 0.9691, "fz_peak_at_touchdown_mean": 1250.66, "action_rate_rms": 21.7127, "body_accel_rms": 4.1439},
+    "backward_06":  {"vxy_rmse": 0.1936, "vyaw_rmse": 0.1182, "touchdown_vz_peak": 1.1730, "touchdown_vz_rms": 1.0720, "fz_peak_at_touchdown_mean": 1407.80, "action_rate_rms": 24.3315, "body_accel_rms": 4.4332},
+    "backward_09":  {"vxy_rmse": 0.3223, "vyaw_rmse": 0.2287, "touchdown_vz_peak": 1.2664, "touchdown_vz_rms": 1.1830, "fz_peak_at_touchdown_mean": 1482.24, "action_rate_rms": 27.0751, "body_accel_rms": 4.8881},
+    "strafe_left":  {"vxy_rmse": 0.2147, "vyaw_rmse": 0.0722, "touchdown_vz_peak": 0.9669, "touchdown_vz_rms": 0.9161, "fz_peak_at_touchdown_mean": 1278.78, "action_rate_rms": 21.0777, "body_accel_rms": 4.1093},
+    "strafe_right": {"vxy_rmse": 0.2037, "vyaw_rmse": 0.1367, "touchdown_vz_peak": 1.0230, "touchdown_vz_rms": 0.8935, "fz_peak_at_touchdown_mean": 1036.91, "action_rate_rms": 21.4333, "body_accel_rms": 4.0263},
+    "yaw_left":     {"vxy_rmse": 0.1543, "vyaw_rmse": 0.1230, "touchdown_vz_peak": 0.9668, "touchdown_vz_rms": 0.9208, "fz_peak_at_touchdown_mean": 1194.22, "action_rate_rms": 21.2431, "body_accel_rms": 4.0018},
+    "yaw_right":    {"vxy_rmse": 0.1511, "vyaw_rmse": 0.1473, "touchdown_vz_peak": 0.9677, "touchdown_vz_rms": 0.9051, "fz_peak_at_touchdown_mean": 1131.65, "action_rate_rms": 21.0296, "body_accel_rms": 3.9355},
+    "avg":          {"vxy_rmse": 0.2100, "vyaw_rmse": 0.1262, "touchdown_vz_peak": 1.0273, "touchdown_vz_rms": 0.9402, "fz_peak_at_touchdown_mean": 1179.43, "action_rate_rms": 22.5537, "body_accel_rms": 4.3129},
+}
+
 
 @dataclass
 class Args:
@@ -38,6 +55,9 @@ class Args:
 
     json_out: Path | None = None
     """write flat JSON here (wandb-ready)."""
+
+    resume_from_ckpt: Path | None = None
+    """checkpoint .pt that holds the wandb run path; resume that run and log delta-vs-baseline."""
 
 
 def quat_rotate_inverse(quat_xyzw: np.ndarray, vec: np.ndarray) -> np.ndarray:
@@ -212,6 +232,51 @@ def render_markdown(rows: list[dict], metric_names: list[str]) -> str:
     return "\n".join(lines)
 
 
+def _log_to_wandb(rows: list[dict], metric_names: list[str],
+                  ckpt_path: Path, policy_dir: Path) -> None:
+    """Resume the wandb run named in the checkpoint metadata and log delta-vs-baseline."""
+    import plotly.express as px
+    import torch
+    import wandb
+
+    state = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+    if "wandb_run_path" not in state:
+        raise ValueError(f"{ckpt_path} has no wandb_run_path metadata.")
+    entity, project, run_id = state["wandb_run_path"].split("/")
+    # dir= keeps the resumed run's staging files under the eval dir, not cwd.
+    # x_disable_meta=True prevents the resume from overwriting training's argv/program.
+    wandb.init(
+        entity=entity, project=project, id=run_id, resume="allow",
+        dir=policy_dir, settings=wandb.Settings(x_disable_meta=True),
+    )
+
+    scens = [r["scenario"] for r in rows]
+    deltas = np.full((len(scens), len(metric_names)), np.nan)
+    for i, scen in enumerate(scens):
+        for j, m in enumerate(metric_names):
+            base = _BASELINE.get(scen, {}).get(m)
+            if base:
+                deltas[i, j] = (rows[i][m] - base) / base * 100.0
+
+    # Plotly figure -> wandb logs as interactive chart panel (Charts section, not Media).
+    vbound = float(np.nanmax(np.abs(deltas))) if not np.all(np.isnan(deltas)) else 50.0
+    fig = px.imshow(
+        deltas,
+        x=metric_names,
+        y=scens,
+        color_continuous_scale="RdYlGn_r",
+        zmin=-vbound, zmax=vbound,
+        text_auto=".1f",
+        aspect="auto",
+        labels={"color": "% Δ"},
+        title=f"% delta vs {_BASELINE_NAME} (negative = better)",
+    )
+    wandb.log({"bench/delta_heatmap": fig})
+    # Pin the exact ckpt used so the bench result is reproducible from the wandb run page.
+    wandb.run.summary["bench/checkpoint"] = str(ckpt_path)
+    wandb.finish()
+
+
 def main(args: Args) -> None:
     manifest, scenarios = load_policy_dir(args.policy_dir)
     dt = 1.0 / manifest["policy_hz"]
@@ -240,6 +305,9 @@ def main(args: Args) -> None:
         flat = {f"{r['scenario']}/{m}": r[m] for r in rows for m in metric_names}
         args.json_out.write_text(json.dumps(flat, indent=2))
         print(f"wrote {args.json_out}")
+
+    if args.resume_from_ckpt:
+        _log_to_wandb(rows, metric_names, args.resume_from_ckpt, args.policy_dir)
 
 
 if __name__ == "__main__":
