@@ -25,22 +25,41 @@ import tyro
 # 12 substeps = 60 ms at 200 Hz. The fz peak can land several substeps after the touchdown firing instant.
 _FZ_PEAK_WINDOW = 12
 
-# Reference run for delta-vs-baseline plots in the wandb log. Regenerate by running this script
-# on a fresh baseline policy_eval directory and copying its avg/per-scenario numbers in.
-_BASELINE_NAME = "fastsac_g1_23dof_mode_4"
+# Baseline for the delta-vs-baseline heatmap. fastsac, symmetry off, flat terrain.
+# Source: https://wandb.ai/matteo-calabria01-maedmatt/IDSIA/runs/60zwuqkq
+_BASELINE_NAME = "fastsac_no_symm_flat_60zwuqkq"
 _BASELINE = {
-    "forward_03":   {"vxy_rmse": 0.1802, "vyaw_rmse": 0.0823, "touchdown_vz_peak": 0.8957, "touchdown_vz_rms": 0.8235, "fz_peak_at_touchdown_mean": 1018.92, "action_rate_rms": 20.9532, "body_accel_rms": 3.8849},
-    "forward_06":   {"vxy_rmse": 0.2226, "vyaw_rmse": 0.1147, "touchdown_vz_peak": 0.9340, "touchdown_vz_rms": 0.8509, "fz_peak_at_touchdown_mean": 1054.03, "action_rate_rms": 22.3073, "body_accel_rms": 4.5682},
-    "forward_09":   {"vxy_rmse": 0.3153, "vyaw_rmse": 0.1348, "touchdown_vz_peak": 0.9761, "touchdown_vz_rms": 0.8682, "fz_peak_at_touchdown_mean":  939.08, "action_rate_rms": 24.3741, "body_accel_rms": 5.1376},
-    "backward_03":  {"vxy_rmse": 0.1427, "vyaw_rmse": 0.1044, "touchdown_vz_peak": 1.1036, "touchdown_vz_rms": 0.9691, "fz_peak_at_touchdown_mean": 1250.66, "action_rate_rms": 21.7127, "body_accel_rms": 4.1439},
-    "backward_06":  {"vxy_rmse": 0.1936, "vyaw_rmse": 0.1182, "touchdown_vz_peak": 1.1730, "touchdown_vz_rms": 1.0720, "fz_peak_at_touchdown_mean": 1407.80, "action_rate_rms": 24.3315, "body_accel_rms": 4.4332},
-    "backward_09":  {"vxy_rmse": 0.3223, "vyaw_rmse": 0.2287, "touchdown_vz_peak": 1.2664, "touchdown_vz_rms": 1.1830, "fz_peak_at_touchdown_mean": 1482.24, "action_rate_rms": 27.0751, "body_accel_rms": 4.8881},
-    "strafe_left":  {"vxy_rmse": 0.2147, "vyaw_rmse": 0.0722, "touchdown_vz_peak": 0.9669, "touchdown_vz_rms": 0.9161, "fz_peak_at_touchdown_mean": 1278.78, "action_rate_rms": 21.0777, "body_accel_rms": 4.1093},
-    "strafe_right": {"vxy_rmse": 0.2037, "vyaw_rmse": 0.1367, "touchdown_vz_peak": 1.0230, "touchdown_vz_rms": 0.8935, "fz_peak_at_touchdown_mean": 1036.91, "action_rate_rms": 21.4333, "body_accel_rms": 4.0263},
-    "yaw_left":     {"vxy_rmse": 0.1543, "vyaw_rmse": 0.1230, "touchdown_vz_peak": 0.9668, "touchdown_vz_rms": 0.9208, "fz_peak_at_touchdown_mean": 1194.22, "action_rate_rms": 21.2431, "body_accel_rms": 4.0018},
-    "yaw_right":    {"vxy_rmse": 0.1511, "vyaw_rmse": 0.1473, "touchdown_vz_peak": 0.9677, "touchdown_vz_rms": 0.9051, "fz_peak_at_touchdown_mean": 1131.65, "action_rate_rms": 21.0296, "body_accel_rms": 3.9355},
-    "avg":          {"vxy_rmse": 0.2100, "vyaw_rmse": 0.1262, "touchdown_vz_peak": 1.0273, "touchdown_vz_rms": 0.9402, "fz_peak_at_touchdown_mean": 1179.43, "action_rate_rms": 22.5537, "body_accel_rms": 4.3129},
+    "forward_03":   {"vxy_rmse": 0.1722, "vyaw_rmse": 0.1332, "touchdown_vz_peak": 0.8926, "touchdown_vz_rms": 0.8666, "fz_peak_at_touchdown_mean": 1007.82, "action_rate_rms": 21.3010, "body_accel_rms": 3.8982},
+    "forward_06":   {"vxy_rmse": 0.1964, "vyaw_rmse": 0.1349, "touchdown_vz_peak": 0.9591, "touchdown_vz_rms": 0.8744, "fz_peak_at_touchdown_mean": 1017.78, "action_rate_rms": 22.4356, "body_accel_rms": 4.6619},
+    "forward_09":   {"vxy_rmse": 0.2712, "vyaw_rmse": 0.1771, "touchdown_vz_peak": 1.1099, "touchdown_vz_rms": 0.9448, "fz_peak_at_touchdown_mean": 1024.33, "action_rate_rms": 24.7324, "body_accel_rms": 5.5070},
+    "backward_03":  {"vxy_rmse": 0.1843, "vyaw_rmse": 0.1881, "touchdown_vz_peak": 1.0404, "touchdown_vz_rms": 0.9740, "fz_peak_at_touchdown_mean": 1300.63, "action_rate_rms": 21.2034, "body_accel_rms": 3.8724},
+    "backward_06":  {"vxy_rmse": 0.2465, "vyaw_rmse": 0.1802, "touchdown_vz_peak": 1.1827, "touchdown_vz_rms": 1.0797, "fz_peak_at_touchdown_mean": 1367.51, "action_rate_rms": 23.1583, "body_accel_rms": 4.1011},
+    "backward_09":  {"vxy_rmse": 0.3810, "vyaw_rmse": 0.1311, "touchdown_vz_peak": 1.2760, "touchdown_vz_rms": 1.2109, "fz_peak_at_touchdown_mean": 1499.52, "action_rate_rms": 25.6915, "body_accel_rms": 4.4746},
+    "strafe_left":  {"vxy_rmse": 0.2338, "vyaw_rmse": 0.1355, "touchdown_vz_peak": 0.9401, "touchdown_vz_rms": 0.9175, "fz_peak_at_touchdown_mean": 1107.19, "action_rate_rms": 21.1900, "body_accel_rms": 3.9158},
+    "strafe_right": {"vxy_rmse": 0.2219, "vyaw_rmse": 0.1365, "touchdown_vz_peak": 1.0245, "touchdown_vz_rms": 0.9088, "fz_peak_at_touchdown_mean": 1100.79, "action_rate_rms": 21.4351, "body_accel_rms": 3.8061},
+    "yaw_left":     {"vxy_rmse": 0.1677, "vyaw_rmse": 0.1266, "touchdown_vz_peak": 0.9460, "touchdown_vz_rms": 0.8656, "fz_peak_at_touchdown_mean": 1003.12, "action_rate_rms": 21.0539, "body_accel_rms": 3.6745},
+    "yaw_right":    {"vxy_rmse": 0.1725, "vyaw_rmse": 0.2016, "touchdown_vz_peak": 0.9490, "touchdown_vz_rms": 0.9104, "fz_peak_at_touchdown_mean": 1081.99, "action_rate_rms": 21.1834, "body_accel_rms": 3.7517},
+    "avg":          {"vxy_rmse": 0.2247, "vyaw_rmse": 0.1545, "touchdown_vz_peak": 1.0320, "touchdown_vz_rms": 0.9553, "fz_peak_at_touchdown_mean": 1151.07, "action_rate_rms": 22.3385, "body_accel_rms": 4.1663},
 }
+
+# Per-metric scenario mask. A metric appears on the delta heatmap only where the scenario
+# actively exercises it. Metrics that measure drift around zero (vyaw_rmse on non-yaw
+# scenarios, vxy_rmse on yaw scenarios) get masked because tiny absolute drifts produce
+# large percent deltas when the baseline value is near zero. Metrics not listed
+# here are relevant on every scenario.
+_RELEVANT_SCENARIOS = {
+    "vxy_rmse":  {"forward_03", "forward_06", "forward_09",
+                  "backward_03", "backward_06", "backward_09",
+                  "strafe_left", "strafe_right"},
+    "vyaw_rmse": {"yaw_left", "yaw_right"},
+}
+
+
+def _is_relevant(scenario: str, metric: str) -> bool:
+    if scenario == "avg":
+        return True
+    relevant = _RELEVANT_SCENARIOS.get(metric)
+    return relevant is None or scenario in relevant
 
 
 @dataclass
@@ -254,6 +273,8 @@ def _log_to_wandb(rows: list[dict], metric_names: list[str],
     deltas = np.full((len(scens), len(metric_names)), np.nan)
     for i, scen in enumerate(scens):
         for j, m in enumerate(metric_names):
+            if not _is_relevant(scen, m):
+                continue
             base = _BASELINE.get(scen, {}).get(m)
             if base:
                 deltas[i, j] = (rows[i][m] - base) / base * 100.0
@@ -288,8 +309,12 @@ def main(args: Args) -> None:
             for name, lo, hi in scenarios]
     metric_names = [k for k in rows[0].keys() if k != "scenario"]
 
-    avg = {"scenario": "avg",
-           **{m: float(np.mean([r[m] for r in rows])) for m in metric_names}}
+    # avg row averages only over scenarios where each metric is relevant,
+    # so e.g. avg/vyaw_rmse is the mean over yaw_left/yaw_right only.
+    avg = {"scenario": "avg"}
+    for m in metric_names:
+        vals = [r[m] for r in rows if _is_relevant(r["scenario"], m)]
+        avg[m] = float(np.mean(vals)) if vals else float("nan")
     rows.append(avg)
 
     print(render_markdown(rows, metric_names))
