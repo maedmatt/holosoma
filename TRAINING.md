@@ -41,9 +41,26 @@ scripts/train_and_bench.sh fastsac_noise_pred_w600 \
     --training.project IDSIA \
     --algo.config.use-symmetry False \
     --reward.terms.penalty_noise.params.noise_predictor_ckpt=models/v11_sim_no_cmd_all36/best.pt \
+    --reward.terms.penalty_noise.params.gate_window=1 \
     --reward.terms.penalty_noise.weight=-600.0 \
     --logger.tags "('noise-predictor', 'fastsac', 'no-symmetry', 'flat-terrain')"
 ```
+
+### 4. FastSAC + noise predictor + linear discount
+
+```bash
+scripts/train_and_bench.sh fastsac_noise_pred_w600_disc5 \
+  python -m holosoma.train_agent exp:g1-23dof-quiet-fast-sac \
+    simulator:isaacgym terrain:terrain-locomotion-plane logger:wandb \
+    --training.project IDSIA \
+    --algo.config.use-symmetry False \
+    --reward.terms.penalty_noise.params.noise_predictor_ckpt=models/v11_sim_no_cmd_all36/best.pt \
+    --reward.terms.penalty_noise.params.gate_window=5 \
+    --reward.terms.penalty_noise.weight=-600.0 \
+    --logger.tags "('noise-predictor', 'fastsac', 'no-symmetry', 'flat-terrain', 'gate-discount')"
+```
+
+---
 
 ## Cluster (no video)
 
@@ -83,6 +100,22 @@ scripts/train_and_bench.sh fastsac_noise_pred_w600 \
     --algo.config.use-symmetry False \
     --logger.video.enabled False \
     --reward.terms.penalty_noise.params.noise_predictor_ckpt=models/v11_sim_no_cmd_all36/best.pt \
+    --reward.terms.penalty_noise.params.gate_window=1 \
     --reward.terms.penalty_noise.weight=-600.0 \
     --logger.tags "('noise-predictor', 'fastsac', 'no-symmetry', 'flat-terrain', 'cluster')"
+```
+
+### 4. FastSAC + noise predictor + linear discount
+
+```bash
+scripts/train_and_bench.sh fastsac_noise_pred_w600_disc5 \
+  python -m holosoma.train_agent exp:g1-23dof-quiet-fast-sac \
+    simulator:isaacgym terrain:terrain-locomotion-plane logger:wandb \
+    --training.project IDSIA \
+    --algo.config.use-symmetry False \
+    --reward.terms.penalty_noise.params.noise_predictor_ckpt=models/v11_sim_no_cmd_all36/best.pt \
+    --reward.terms.penalty_noise.params.gate_window=5 \
+    --reward.terms.penalty_noise.weight=-600.0 \
+    --logger.video.enabled False \
+    --logger.tags "('noise-predictor', 'fastsac', 'no-symmetry', 'flat-terrain', 'gate-discount', 'cluster')"
 ```
