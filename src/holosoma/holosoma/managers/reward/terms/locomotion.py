@@ -137,10 +137,10 @@ def penalty_feet_velocity(env: LeggedRobotLocomotionManager) -> torch.Tensor:
 
 
 class NoisePredictorPenalty(RewardTermBase):
-    """Predicted-loudness penalty, fired only on detected foot touchdowns.
+    """Predicted-loudness penalty with a linear post-touchdown discount.
 
-    The locosonic predictor was trained on touchdown-windowed inputs, so we
-    only emit a signal on touchdown events. Returns 0 between impacts.
+    On touchdown, holds the predictor's value and applies it for
+    `gate_window` steps with linearly decreasing weight (1, 1-1/N, ..., 0).
     Checkpoint path: cfg.params["noise_predictor_ckpt"].
     """
 
@@ -149,25 +149,51 @@ class NoisePredictorPenalty(RewardTermBase):
         ckpt = cfg.params["noise_predictor_ckpt"]
         self._predictor = BatchedNoisePredictor(ckpt, num_envs=env.num_envs, device=env.device)
         self._detector = TouchdownDetector(num_envs=env.num_envs, num_feet=len(env.feet_indices))
+        self._gate_window = int(cfg.params.get("gate_window", 5))
+        self._value_at_touchdown = torch.zeros(env.num_envs, device=env.device)
+        self._discount = torch.zeros(env.num_envs, device=env.device)
+        self._vz_prev = torch.zeros(env.num_envs, len(env.feet_indices), device=env.device)
 
     def reset(self, env_ids: torch.Tensor | None = None) -> None:
         self._predictor.reset(env_ids)
         self._detector.reset(env_ids)
+        if env_ids is None:
+            self._value_at_touchdown.zero_()
+            self._discount.zero_()
+            self._vz_prev.zero_()
+        else:
+            self._value_at_touchdown[env_ids] = 0.0
+            self._discount[env_ids] = 0.0
+            self._vz_prev[env_ids] = 0.0
 
     def __call__(self, env: Any, **kwargs: Any) -> torch.Tensor:
         ready = self._predictor.update_buffer(env)
         vz = env.simulator._rigid_body_vel[:, env.feet_indices, 2]
         fz = env.simulator.contact_forces[:, env.feet_indices, 2]
-        fired = self._detector.step(vz, fz).any(dim=1)
-        gate = ready & fired
+        fired_per_foot = self._detector.step(vz, fz)
+        fired = ready & fired_per_foot.any(dim=1)
         raw_out = self._predictor.forward()[:, 0]
+        raw_out_clamped = raw_out.clamp(min=0.0)
 
+        # On fire: hold the predictor's value, reset discount to 1. Otherwise: decay discount linearly.
+        self._value_at_touchdown = torch.where(fired, raw_out_clamped, self._value_at_touchdown)
+        self._discount = torch.where(
+            fired,
+            torch.ones_like(self._discount),
+            (self._discount - 1.0 / self._gate_window).clamp(min=0.0),
+        )
+
+        nan = torch.full_like(fz, float("nan"))
         env.log_dict["noise/raw_out_mean"] = raw_out.mean()
         env.log_dict["noise/raw_out_std"] = raw_out.std()
         env.log_dict["noise/neg_rate"] = (raw_out < 0).float().mean()
-        env.log_dict["noise/gate_rate"] = gate.float().mean()
+        env.log_dict["noise/gate_rate"] = fired.float().mean()
+        env.log_dict["noise/fz_at_fire"] = torch.where(fired_per_foot, fz, nan).nanmean()
+        env.log_dict["noise/vz_at_pre"] = torch.where(fired_per_foot, self._vz_prev, nan).nanmean()
 
-        return raw_out.clamp(min=0.0) * gate.float()
+        # Save at the end: next step's `vz_at_pre` reads this step's vz (the sample just before fire).
+        self._vz_prev = vz
+        return self._value_at_touchdown * self._discount
 
 
 # ================================================================================================
