@@ -271,10 +271,14 @@ def _log_to_wandb(rows: list[dict], metric_names: list[str],
         dir=policy_dir, settings=wandb.Settings(x_disable_meta=True),
     )
 
+    # Touchdown counts are sanity-check diagnostics, not delta metrics — they
+    # have no baseline, so they'd render as blank columns in the heatmap.
+    heatmap_metrics = [m for m in metric_names if not m.startswith("touchdown_count")]
+
     scens = [r["scenario"] for r in rows]
-    deltas = np.full((len(scens), len(metric_names)), np.nan)
+    deltas = np.full((len(scens), len(heatmap_metrics)), np.nan)
     for i, scen in enumerate(scens):
-        for j, m in enumerate(metric_names):
+        for j, m in enumerate(heatmap_metrics):
             if not _is_relevant(scen, m):
                 continue
             base = _BASELINE.get(scen, {}).get(m)
@@ -285,7 +289,7 @@ def _log_to_wandb(rows: list[dict], metric_names: list[str],
     vbound = float(np.nanmax(np.abs(deltas))) if not np.all(np.isnan(deltas)) else 50.0
     fig = px.imshow(
         deltas,
-        x=metric_names,
+        x=heatmap_metrics,
         y=scens,
         color_continuous_scale="RdYlGn_r",
         zmin=-vbound, zmax=vbound,
