@@ -194,6 +194,8 @@ def _impact_metrics(foot_vel: np.ndarray, foot_force: np.ndarray,
     ])
     fz_left, fz_right = foot_force[:, 0, 2], foot_force[:, 1, 2]
     return {
+        "touchdown_count_left": float(len(td_left)),
+        "touchdown_count_right": float(len(td_right)),
         "touchdown_vz_peak": touchdown_vz_peak(vz_at_td),
         "touchdown_vz_rms": touchdown_vz_rms(vz_at_td),
         "fz_peak_at_touchdown_mean": 0.5 * (

@@ -41,10 +41,12 @@ python -m holosoma.eval_agent \
 
 # 4. Compute metrics on the just-created policy_eval dir, resume the
 # training's wandb run (path read from ckpt metadata), log the heatmap +
-# per-(scenario, metric) scalars.
-eval_dir=$(ls -dt logs/*/*${bench_tag}*/policy_eval 2>/dev/null | head -1 || true)
+# per-(scenario, metric) scalars. Same start_ts guard as the ckpt picker
+# so a stale eval dir from a prior crashed run can't shadow this one.
+eval_dir=$(find logs -type d -name policy_eval -path "*${bench_tag}*" -newermt "@${start_ts}" 2>/dev/null \
+           | xargs -r ls -dt 2>/dev/null | head -1 || true)
 if [[ -z "${eval_dir}" ]]; then
-  echo "error: no policy_eval dir found; did eval crash before saving the first scenario?"
+  echo "error: no policy_eval dir written after ${start_ts} under logs/*/*${bench_tag}*/policy_eval; did eval crash before saving the first scenario?"
   exit 1
 fi
 python scripts/policy_metrics.py --policy-dir "${eval_dir}" --resume-from-ckpt "${ckpt}"
