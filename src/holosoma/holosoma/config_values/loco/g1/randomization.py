@@ -103,4 +103,33 @@ g1_29dof_randomization = RandomizationManagerCfg(
     },
 )
 
-__all__ = ["g1_29dof_randomization"]
+g1_benchmark_randomization = RandomizationManagerCfg(
+    setup_terms={
+        "mass_randomizer": RandomizationTermCfg(
+            func="holosoma.managers.randomization.terms.locomotion:randomize_mass_startup",
+            params={
+                "enable_link_mass": True,
+                "link_mass_range": [0.9, 1.2],
+                "enable_base_mass": True,
+                "added_mass_range": [-1.0, 3.0],
+            },
+        ),
+        "randomize_friction_startup": RandomizationTermCfg(
+            func="holosoma.managers.randomization.terms.locomotion:randomize_friction_startup",
+            params={
+                "friction_range": [0.5, 1.25],
+                "enabled": True,
+            },
+        ),
+        "randomize_base_com_startup": RandomizationTermCfg(
+            func="holosoma.managers.randomization.terms.locomotion:randomize_base_com_startup",
+            params={
+                "base_com_range": {"x": [-0.05, 0.05], "y": [-0.05, 0.05], "z": [-0.05, 0.05]},
+                "enabled": True,
+            },
+        ),
+    },
+)
+
+
+__all__ = ["g1_29dof_randomization", "g1_benchmark_randomization"]

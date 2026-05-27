@@ -28,15 +28,18 @@ if [[ -z "${ckpt}" ]]; then
 fi
 echo "checkpoint: ${ckpt}"
 
-# 3. Headless benchmark eval with the policy_eval callback.
+# 3. Headless benchmark eval with the policy_eval callback. 64 envs with
+# per-env startup randomization (mass/friction/COM) so the metrics carry
+# a mean ± std across the physics distribution.
 python -m holosoma.eval_agent \
   --checkpoint="${ckpt}" \
   --policy-eval.config.enabled \
   --training.name="${bench_tag}" \
   --training.max-eval-steps=16000 \
   --training.headless=True \
+  --training.num-envs=64 \
   --simulator.config.highrate-logging-enabled=True \
-  randomization:none \
+  randomization:g1-benchmark \
   terrain:terrain-locomotion-plane || true
 
 # 4. Compute metrics on the just-created policy_eval dir, resume the

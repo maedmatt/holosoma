@@ -3,6 +3,12 @@
 Reads <policy_dir>/manifest.json plus each scenario's 50 Hz and 200 Hz
 NPZ pair; prints a markdown table and optionally writes CSV/JSON.
 
+NPZ arrays carry shape (T, num_envs, ...). Per-env metric values are
+computed independently, then aggregated to (mean, std) across envs. The
+raw per-env metric values are also dumped to per_env_metrics.json for
+paired-comparison analysis. The single-env case (num_envs=1) falls out
+naturally: same loop, std=0.
+
 Convention:
   - 200 Hz substep stream (`_200hz.npz`) is the source of truth for foot
     kinematics, contact forces, and base state. Impact metrics and
@@ -21,6 +27,9 @@ from pathlib import Path
 import numpy as np
 import tyro
 
+
+# Foot index in sim arrays: 0 = left, 1 = right.
+FEET = {"left": 0, "right": 1}
 
 # 12 substeps = 60 ms at 200 Hz. The fz peak can land several substeps after the touchdown firing instant.
 _FZ_PEAK_WINDOW = 12
@@ -42,24 +51,18 @@ _BASELINE = {
     "avg":          {"vxy_rmse": 0.2247, "vyaw_rmse": 0.1545, "touchdown_vz_peak": 1.0320, "touchdown_vz_rms": 0.9553, "fz_peak_at_touchdown_mean": 1151.07, "action_rate_rms": 22.3385, "body_accel_rms": 4.1663},
 }
 
-# Per-metric scenario mask. A metric appears on the delta heatmap only where the scenario
-# actively exercises it. Metrics that measure drift around zero (vyaw_rmse on non-yaw
-# scenarios, vxy_rmse on yaw scenarios) get masked because tiny absolute drifts produce
-# large percent deltas when the baseline value is near zero. Metrics not listed
-# here are relevant on every scenario.
-_RELEVANT_SCENARIOS = {
-    "vxy_rmse":  {"forward_03", "forward_06", "forward_09",
-                  "backward_03", "backward_06", "backward_09",
-                  "strafe_left", "strafe_right"},
-    "vyaw_rmse": {"yaw_left", "yaw_right"},
-}
+def _mask_tracking_drift(row: dict, cmd: np.ndarray) -> None:
+    """NaN-mask tracking metrics the scenario doesn't actively exercise.
 
-
-def _is_relevant(scenario: str, metric: str) -> bool:
-    if scenario == "avg":
-        return True
-    relevant = _RELEVANT_SCENARIOS.get(metric)
-    return relevant is None or scenario in relevant
+    On a forward command, vyaw_rmse measures incidental yaw drift (e.g. from
+    pitch coupling), not tracking quality. Small drifts on the unexercised
+    axis vary a lot between policies and blow up percent deltas, drowning
+    out the metrics that actually correspond to the scenario's task.
+    """
+    if np.max(np.abs(cmd[:, :2])) < 1e-3:
+        row["vxy_rmse"] = float("nan")
+    if np.max(np.abs(cmd[:, 2])) < 1e-3:
+        row["vyaw_rmse"] = float("nan")
 
 
 @dataclass
@@ -177,57 +180,59 @@ def body_accel_rms(lin_vel_world: np.ndarray, dt: float) -> float:
     return float(np.sqrt(np.mean(np.sum(a**2, axis=-1))))
 
 
-def _impact_metrics(foot_vel: np.ndarray, foot_force: np.ndarray,
-                    is_active: np.ndarray) -> dict[str, float]:
-    """Touchdown-derived metrics. Events firing outside is_active are dropped."""
-    td_left = detect_touchdowns(foot_vel[:, 0, 2], foot_force[:, 0, 2])
-    td_right = detect_touchdowns(foot_vel[:, 1, 2], foot_force[:, 1, 2])
-    td_left = td_left[is_active[td_left]]
-    td_right = td_right[is_active[td_right]]
-    # Approach velocity span the threshold crossing: take the more
-    # downward of {pre, post} samples; whichever is pre-impulse holds the
-    # actual impact speed regardless of when within step i-1 -> i the
-    # solver applied the contact impulse.
-    vz_at_td = np.concatenate([
-        np.minimum(foot_vel[td_left - 1, 0, 2], foot_vel[td_left, 0, 2]),
-        np.minimum(foot_vel[td_right - 1, 1, 2], foot_vel[td_right, 1, 2]),
-    ])
-    fz_left, fz_right = foot_force[:, 0, 2], foot_force[:, 1, 2]
+def _foot_metrics(npz_hi: dict, foot_idx: int, env_idx: int) -> dict[str, float]:
+    """Touchdown-derived metrics for one foot on one env. Events outside is_active are dropped."""
+    vz = npz_hi["foot_vel"][:, env_idx, foot_idx, 2]
+    fz = npz_hi["foot_force"][:, env_idx, foot_idx, 2]
+    td = detect_touchdowns(vz, fz)
+    td = td[npz_hi["is_active"][td]]
+    # Approach velocity spans the threshold crossing: take the more downward of
+    # {pre, post}; whichever is pre-impulse holds the actual impact speed.
+    vz_at_td = np.minimum(vz[td - 1], vz[td])
     return {
-        "touchdown_count_left": float(len(td_left)),
-        "touchdown_count_right": float(len(td_right)),
+        "touchdown_count": float(len(td)),
         "touchdown_vz_peak": touchdown_vz_peak(vz_at_td),
         "touchdown_vz_rms": touchdown_vz_rms(vz_at_td),
-        "fz_peak_at_touchdown_mean": 0.5 * (
-            fz_peak_at_touchdown_mean(td_left, fz_left)
-            + fz_peak_at_touchdown_mean(td_right, fz_right)
-        ),
+        "fz_peak_at_touchdown_mean": fz_peak_at_touchdown_mean(td, fz),
     }
 
 
-def compute_scenario_metrics(npz: dict, npz_hi: dict,
-                             dt: float, sim_dt: float) -> dict[str, float]:
-    """All metrics on the active window of one scenario."""
+def _body_metrics(npz: dict, npz_hi: dict, dt: float, sim_dt: float, env_idx: int) -> dict[str, float]:
+    """Locomotion-quality metrics for one env: tracking + smoothness. Foot-agnostic."""
     active = npz["is_active"]
-    base_quat_lo = npz["base_quat"][active]
-    base_lin_vel_lo = npz["base_lin_vel"][active]
-    base_ang_vel_lo = npz["base_ang_vel"][active]
-    cmd = npz["cmd"][active]
-    action = npz["action"][active]
-
-    vel_body = quat_rotate_inverse(base_quat_lo, base_lin_vel_lo)
-    omega_body = quat_rotate_inverse(base_quat_lo, base_ang_vel_lo)
-
     active_hi = npz_hi["is_active"]
-    impact = _impact_metrics(npz_hi["foot_vel"], npz_hi["foot_force"], active_hi)
-
+    vel_body = quat_rotate_inverse(npz["base_quat"][active, env_idx], npz["base_lin_vel"][active, env_idx])
+    omega_body = quat_rotate_inverse(npz["base_quat"][active, env_idx], npz["base_ang_vel"][active, env_idx])
     return {
-        "vxy_rmse": vxy_rmse(vel_body[:, :2], cmd[:, :2]),
-        "vyaw_rmse": vyaw_rmse(omega_body[:, 2], cmd[:, 2]),
-        **impact,
-        "action_rate_rms": action_rate_rms(action, dt),
-        "body_accel_rms": body_accel_rms(npz_hi["base_lin_vel"][active_hi], sim_dt),
+        "vxy_rmse": vxy_rmse(vel_body[:, :2], npz["cmd"][active, env_idx, :2]),
+        "vyaw_rmse": vyaw_rmse(omega_body[:, 2], npz["cmd"][active, env_idx, 2]),
+        "action_rate_rms": action_rate_rms(npz["action"][active, env_idx], dt),
+        "body_accel_rms": body_accel_rms(npz_hi["base_lin_vel"][active_hi, env_idx], sim_dt),
     }
+
+
+def _aggregate(per_env: list[dict]) -> tuple[dict, dict]:
+    """NaN-aware element-wise mean and std across a list of per-env metric dicts."""
+    keys = list(per_env[0].keys())
+    mean: dict = {}
+    std: dict = {}
+    for k in keys:
+        vals = np.array([r[k] for r in per_env], dtype=float)
+        finite = vals[~np.isnan(vals)]
+        mean[k] = float(np.mean(finite)) if finite.size else float("nan")
+        std[k] = float(np.std(finite)) if finite.size else float("nan")
+    return mean, std
+
+
+def _append_avg(rows: list[dict]) -> list[str]:
+    """Append the 'avg' row in place (mean over non-NaN cells per metric). Returns metric names."""
+    metric_names = [k for k in rows[0] if k != "scenario"]
+    avg: dict = {"scenario": "avg"}
+    for m in metric_names:
+        vals = [r[m] for r in rows if not np.isnan(r[m])]
+        avg[m] = float(np.mean(vals)) if vals else float("nan")
+    rows.append(avg)
+    return metric_names
 
 
 def load_policy_dir(policy_dir: Path) -> tuple[dict, list[tuple[str, dict, dict]]]:
@@ -242,21 +247,52 @@ def load_policy_dir(policy_dir: Path) -> tuple[dict, list[tuple[str, dict, dict]
     return manifest, scenarios
 
 
-def render_markdown(rows: list[dict], metric_names: list[str]) -> str:
+def render_markdown(rows_mean: list[dict], rows_std: list[dict], metric_names: list[str]) -> str:
+    """Format each cell as `mean ± std`. NaN means propagate as 'nan'."""
     headers = ["scenario"] + metric_names
     lines = ["| " + " | ".join(headers) + " |",
              "|" + "|".join(["---"] * len(headers)) + "|"]
-    for r in rows:
-        lines.append("| " + " | ".join(
-            [r["scenario"]] + [f"{r[m]:.4f}" for m in metric_names]
-        ) + " |")
+    for rm, rs in zip(rows_mean, rows_std):
+        cells = [rm["scenario"]]
+        for m in metric_names:
+            mean = rm[m]
+            if np.isnan(mean):
+                cells.append("nan")
+            else:
+                cells.append(f"{mean:.4f}±{rs[m]:.4f}")
+        lines.append("| " + " | ".join(cells) + " |")
     return "\n".join(lines)
 
 
-def _log_to_wandb(rows: list[dict], metric_names: list[str],
-                  ckpt_path: Path, policy_dir: Path) -> None:
-    """Resume the wandb run named in the checkpoint metadata and log delta-vs-baseline."""
+def _delta_matrix(rows: list[dict], metrics: list[str]) -> np.ndarray:
+    """Percent delta of each (scenario, metric) cell vs `_BASELINE`. NaN where masked."""
+    deltas = np.empty((len(rows), len(metrics)))
+    for i, r in enumerate(rows):
+        for j, m in enumerate(metrics):
+            base = _BASELINE[r["scenario"]][m]
+            deltas[i, j] = (r[m] - base) / base * 100.0  # NaN-in (masked) propagates
+    return deltas
+
+
+def _heatmap(deltas: np.ndarray, metrics: list[str], scens: list[str],
+             title: str, vbound: float):
+    """Plotly delta-vs-baseline heatmap with caller-supplied symmetric color bound."""
     import plotly.express as px
+    return px.imshow(
+        deltas, x=metrics, y=scens,
+        color_continuous_scale="RdYlGn_r",
+        zmin=-vbound, zmax=vbound,
+        text_auto=".1f",
+        aspect="auto",
+        labels={"color": "% Δ"},
+        title=f"{title}: % delta vs {_BASELINE_NAME} (negative = better)",
+    )
+
+
+def _log_to_wandb(loco_rows: list[dict], loco_metrics: list[str],
+                  per_leg: dict[str, tuple[list[dict], list[str]]],
+                  ckpt_path: Path, policy_dir: Path) -> None:
+    """Resume the wandb run from the checkpoint metadata; log locomotion + per-leg sound heatmaps."""
     import torch
     import wandb
 
@@ -271,34 +307,27 @@ def _log_to_wandb(rows: list[dict], metric_names: list[str],
         dir=policy_dir, settings=wandb.Settings(x_disable_meta=True),
     )
 
-    # Touchdown counts are sanity-check diagnostics, not delta metrics — they
-    # have no baseline, so they'd render as blank columns in the heatmap.
-    heatmap_metrics = [m for m in metric_names if not m.startswith("touchdown_count")]
+    # Locomotion heatmap: own color bound (metric domain unrelated to sound).
+    loco_deltas = _delta_matrix(loco_rows, loco_metrics)
+    loco_vbound = float(np.nanmax(np.abs(loco_deltas)))
+    wandb.log({"bench/delta_heatmap_locomotion": _heatmap(
+        loco_deltas, loco_metrics, [r["scenario"] for r in loco_rows],
+        title="Locomotion quality", vbound=loco_vbound,
+    )})
 
-    scens = [r["scenario"] for r in rows]
-    deltas = np.full((len(scens), len(heatmap_metrics)), np.nan)
-    for i, scen in enumerate(scens):
-        for j, m in enumerate(heatmap_metrics):
-            if not _is_relevant(scen, m):
-                continue
-            base = _BASELINE.get(scen, {}).get(m)
-            if base:
-                deltas[i, j] = (rows[i][m] - base) / base * 100.0
+    # Sound heatmaps: touchdown_count is a sanity-check diagnostic with no baseline,
+    # drop it. Shared color bound across L/R so asymmetries are visually comparable.
+    sound = []
+    for leg, (rows, metric_names) in per_leg.items():
+        metrics = [m for m in metric_names if not m.startswith("touchdown_count")]
+        sound.append((leg, rows, metrics, _delta_matrix(rows, metrics)))
+    sound_vbound = float(np.nanmax(np.abs(np.concatenate([d.flatten() for _, _, _, d in sound]))))
+    for leg, rows, metrics, deltas in sound:
+        wandb.log({f"bench/delta_heatmap_sound_{leg}": _heatmap(
+            deltas, metrics, [r["scenario"] for r in rows],
+            title=f"Sound quality, {leg} foot", vbound=sound_vbound,
+        )})
 
-    # Plotly figure -> wandb logs as interactive chart panel (Charts section, not Media).
-    vbound = float(np.nanmax(np.abs(deltas))) if not np.all(np.isnan(deltas)) else 50.0
-    fig = px.imshow(
-        deltas,
-        x=heatmap_metrics,
-        y=scens,
-        color_continuous_scale="RdYlGn_r",
-        zmin=-vbound, zmax=vbound,
-        text_auto=".1f",
-        aspect="auto",
-        labels={"color": "% Δ"},
-        title=f"% delta vs {_BASELINE_NAME} (negative = better)",
-    )
-    wandb.log({"bench/delta_heatmap": fig})
     # Pin the exact ckpt used so the bench result is reproducible from the wandb run page.
     wandb.run.summary["bench/checkpoint"] = str(ckpt_path)
     wandb.finish()
@@ -308,37 +337,102 @@ def main(args: Args) -> None:
     manifest, scenarios = load_policy_dir(args.policy_dir)
     dt = 1.0 / manifest["policy_hz"]
     sim_dt = 1.0 / manifest["sim_hz"]
+    # Manifest field added with multi-env benchmarking; old recordings detect from shape.
+    num_envs = int(manifest.get("num_envs", scenarios[0][1]["cmd"].shape[1]))
 
-    print(f"# {args.policy_dir.name}")
+    print(f"# {args.policy_dir.name}  (num_envs={num_envs})")
 
-    rows = [{"scenario": name, **compute_scenario_metrics(lo, hi, dt, sim_dt)}
-            for name, lo, hi in scenarios]
-    metric_names = [k for k in rows[0].keys() if k != "scenario"]
+    per_env_dump: dict[str, dict] = {}
 
-    # avg row averages only over scenarios where each metric is relevant,
-    # so e.g. avg/vyaw_rmse is the mean over yaw_left/yaw_right only.
-    avg = {"scenario": "avg"}
-    for m in metric_names:
-        vals = [r[m] for r in rows if _is_relevant(r["scenario"], m)]
-        avg[m] = float(np.mean(vals)) if vals else float("nan")
-    rows.append(avg)
+    # Locomotion quality: tracking + smoothness, shared across legs.
+    loco_mean = []
+    loco_std = []
+    for name, lo, hi in scenarios:
+        # cmd is broadcast across envs, so masking decision is identical across envs.
+        cmd_for_mask = lo["cmd"][:, 0]
+        per_env = []
+        for n in range(num_envs):
+            row = _body_metrics(lo, hi, dt, sim_dt, env_idx=n)
+            _mask_tracking_drift(row, cmd_for_mask)
+            per_env.append(row)
+        mean, std = _aggregate(per_env)
+        loco_mean.append({"scenario": name, **mean})
+        loco_std.append({"scenario": name, **std})
+        per_env_dump.setdefault(name, {})["locomotion"] = per_env
+    loco_metrics = _append_avg(loco_mean)
+    _append_avg(loco_std)
+    print("\n## Locomotion quality")
+    print(render_markdown(loco_mean, loco_std, loco_metrics))
 
-    print(render_markdown(rows, metric_names))
+    # Sound quality: per-leg foot impact metrics. Asymmetry between L/R is the signal.
+    per_leg_mean: dict[str, list[dict]] = {}
+    per_leg_std: dict[str, list[dict]] = {}
+    per_leg_metrics: dict[str, list[str]] = {}
+    for leg, idx in FEET.items():
+        mean_rows = []
+        std_rows = []
+        for name, _, hi in scenarios:
+            per_env = [_foot_metrics(hi, idx, env_idx=n) for n in range(num_envs)]
+            mean, std = _aggregate(per_env)
+            mean_rows.append({"scenario": name, **mean})
+            std_rows.append({"scenario": name, **std})
+            per_env_dump.setdefault(name, {}).setdefault("feet", {})[leg] = per_env
+        metrics = _append_avg(mean_rows)
+        _append_avg(std_rows)
+        per_leg_mean[leg] = mean_rows
+        per_leg_std[leg] = std_rows
+        per_leg_metrics[leg] = metrics
+        print(f"\n## Sound quality, {leg} foot")
+        print(render_markdown(mean_rows, std_rows, metrics))
+
+    per_env_path = args.policy_dir / "per_env_metrics.json"
+    per_env_path.write_text(json.dumps(per_env_dump, indent=2))
+    print(f"\nwrote {per_env_path}")
 
     if args.csv_out:
+        sound_metrics = per_leg_metrics["left"]
+        cols = (
+            [f"{m}_mean" for m in loco_metrics] + [f"{m}_std" for m in loco_metrics]
+            + [f"{m}_mean" for m in sound_metrics] + [f"{m}_std" for m in sound_metrics]
+        )
         with args.csv_out.open("w", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=["scenario"] + metric_names)
+            w = csv.DictWriter(f, fieldnames=["section", "scenario"] + cols, extrasaction="ignore")
             w.writeheader()
-            w.writerows(rows)
-        print(f"\nwrote {args.csv_out}")
+            for rm, rs in zip(loco_mean, loco_std):
+                row = {"section": "locomotion", "scenario": rm["scenario"]}
+                for m in loco_metrics:
+                    row[f"{m}_mean"] = rm[m]
+                    row[f"{m}_std"] = rs[m]
+                w.writerow(row)
+            for leg in FEET:
+                for rm, rs in zip(per_leg_mean[leg], per_leg_std[leg]):
+                    row = {"section": f"sound_{leg}", "scenario": rm["scenario"]}
+                    for m in per_leg_metrics[leg]:
+                        row[f"{m}_mean"] = rm[m]
+                        row[f"{m}_std"] = rs[m]
+                    w.writerow(row)
+        print(f"wrote {args.csv_out}")
 
     if args.json_out:
-        flat = {f"{r['scenario']}/{m}": r[m] for r in rows for m in metric_names}
+        flat = {}
+        for rm, rs in zip(loco_mean, loco_std):
+            for m in loco_metrics:
+                flat[f"locomotion/{rm['scenario']}/{m}/mean"] = rm[m]
+                flat[f"locomotion/{rm['scenario']}/{m}/std"] = rs[m]
+        for leg in FEET:
+            for rm, rs in zip(per_leg_mean[leg], per_leg_std[leg]):
+                for m in per_leg_metrics[leg]:
+                    flat[f"sound_{leg}/{rm['scenario']}/{m}/mean"] = rm[m]
+                    flat[f"sound_{leg}/{rm['scenario']}/{m}/std"] = rs[m]
         args.json_out.write_text(json.dumps(flat, indent=2))
         print(f"wrote {args.json_out}")
 
     if args.resume_from_ckpt:
-        _log_to_wandb(rows, metric_names, args.resume_from_ckpt, args.policy_dir)
+        # Heatmap compares mean against the (single-env) baseline scalars. Std is logged
+        # to the per-env file only; rerun the baseline under the new bench config to
+        # refresh _BASELINE before trusting heatmap deltas.
+        per_leg_for_wandb = {leg: (per_leg_mean[leg], per_leg_metrics[leg]) for leg in FEET}
+        _log_to_wandb(loco_mean, loco_metrics, per_leg_for_wandb, args.resume_from_ckpt, args.policy_dir)
 
 
 if __name__ == "__main__":

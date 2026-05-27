@@ -8,6 +8,12 @@ The idle windows let the robot settle before and after the command. Rows
 inside the active window are marked is_active=True; metrics should use
 only those.
 
+All envs run in parallel: the same velocity command is broadcast to every
+env, but per-env startup randomization (mass, friction, COM) gives each a
+different physics draw. Logged tensors carry a leading env axis, so the
+stacked arrays in the NPZ have shape (T, num_envs, ...). Downstream metric
+code is responsible for aggregating across the env axis.
+
 Output goes to <log_dir>/policy_eval/ as one NPZ per scenario plus a
 manifest.json describing the schedule.
 
@@ -34,7 +40,6 @@ from holosoma.utils.timeseries_log import TimeseriesLogger
 SETTLE_S = 1.0  # idle bracket before and after each scenario's active window
 ACTIVE_S = 30.0  # duration of the velocity command in each scenario
 
-ENV_ID = 0
 OUTPUT_DIR = "policy_eval"
 MANIFEST_NAME = "manifest.json"
 MANIFEST_VERSION = 1
@@ -134,9 +139,9 @@ class PolicyEvalCallback(RLEvalCallback):
             vx, vy, vyaw = 0.0, 0.0, 0.0  # idle bracket
 
         cmd = self._env().command_manager.commands
-        cmd[ENV_ID, 0] = vx
-        cmd[ENV_ID, 1] = vy
-        cmd[ENV_ID, 2] = vyaw
+        cmd[:, 0] = vx
+        cmd[:, 1] = vy
+        cmd[:, 2] = vyaw
         return actor_state
 
     def on_post_eval_env_step(self, actor_state: dict) -> dict:
@@ -166,9 +171,9 @@ class PolicyEvalCallback(RLEvalCallback):
     def _log_step(self, actor_state: dict) -> None:
         env = self._env()
 
-        foot_vel = env.simulator._rigid_body_vel[ENV_ID, env.feet_indices, :]
-        foot_pos = env.simulator._rigid_body_pos[ENV_ID, env.feet_indices, :]
-        foot_f = env.simulator.contact_forces[ENV_ID, env.feet_indices, :]
+        foot_vel = env.simulator._rigid_body_vel[:, env.feet_indices, :]
+        foot_pos = env.simulator._rigid_body_pos[:, env.feet_indices, :]
+        foot_f = env.simulator.contact_forces[:, env.feet_indices, :]
 
         if self._prev_foot_vel is None:
             foot_acc = torch.zeros_like(foot_vel)
@@ -176,25 +181,25 @@ class PolicyEvalCallback(RLEvalCallback):
             foot_acc = (foot_vel - self._prev_foot_vel) / self._dt
         self._prev_foot_vel = foot_vel.clone()
 
-        root = env.simulator.robot_root_states[ENV_ID]
+        root = env.simulator.robot_root_states
         gait = env.command_manager.get_state("locomotion_gait")
 
         self._log.append(
             t=self._step_in_scenario * self._dt,
             is_active=self._is_active_step(),
-            cmd=env.command_manager.commands[ENV_ID],
+            cmd=env.command_manager.commands,
             foot_pos=foot_pos,
             foot_vel=foot_vel,
             foot_acc=foot_acc,
             foot_force=foot_f,
-            base_pos=root[:3],
-            base_quat=root[3:7],
-            base_lin_vel=root[7:10],
-            base_ang_vel=root[10:13],
-            dof_pos=env.simulator.dof_pos[ENV_ID],
-            dof_vel=env.simulator.dof_vel[ENV_ID],
-            gait_phase=gait.phase[ENV_ID],
-            action=actor_state["actions"][ENV_ID],
+            base_pos=root[:, :3],
+            base_quat=root[:, 3:7],
+            base_lin_vel=root[:, 7:10],
+            base_ang_vel=root[:, 10:13],
+            dof_pos=env.simulator.dof_pos,
+            dof_vel=env.simulator.dof_vel,
+            gait_phase=gait.phase,
+            action=actor_state["actions"],
         )
 
     def _log_step_hi(self, actor_state: dict) -> None:
@@ -203,26 +208,26 @@ class PolicyEvalCallback(RLEvalCallback):
         are 50 Hz by construction (cmd, action, is_active) are repeated for each row."""
         env = self._env()
         sim = env.simulator
-        cmd = env.command_manager.commands[ENV_ID]
-        action = actor_state["actions"][ENV_ID]
+        cmd = env.command_manager.commands
+        action = actor_state["actions"]
         is_active = self._is_active_step()
         t0 = self._step_in_scenario * self._dt
 
-        rb_vel = sim._rb_vel_substep[ENV_ID]   # [dec, num_bodies, 3]
-        cf = sim._contact_substep[ENV_ID]      # [dec, num_bodies, 3]
-        root = sim._root_substep[ENV_ID]       # [dec, 13]
+        rb_vel = sim._rb_vel_substep   # [num_envs, dec, num_bodies, 3]
+        cf = sim._contact_substep      # [num_envs, dec, num_bodies, 3]
+        root = sim._root_substep       # [num_envs, dec, 13]
 
         for k in range(self._decimation):
             self._log_hi.append(
                 t=t0 + k * self._sim_dt,
                 is_active=is_active,
                 cmd=cmd,
-                foot_vel=rb_vel[k, env.feet_indices, :],
-                foot_force=cf[k, env.feet_indices, :],
-                base_pos=root[k, :3],
-                base_quat=root[k, 3:7],
-                base_lin_vel=root[k, 7:10],
-                base_ang_vel=root[k, 10:13],
+                foot_vel=rb_vel[:, k, env.feet_indices, :],
+                foot_force=cf[:, k, env.feet_indices, :],
+                base_pos=root[:, k, :3],
+                base_quat=root[:, k, 3:7],
+                base_lin_vel=root[:, k, 7:10],
+                base_ang_vel=root[:, k, 10:13],
                 action=action,
             )
 
@@ -246,6 +251,7 @@ class PolicyEvalCallback(RLEvalCallback):
         manifest = {
             "policy_eval_version": MANIFEST_VERSION,
             "simulator": type(self._env().simulator).__name__,
+            "num_envs": self._env().num_envs,
             "policy_hz": 1.0 / self._dt,
             "settle_s": SETTLE_S,
             "active_s": ACTIVE_S,
