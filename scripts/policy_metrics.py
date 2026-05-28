@@ -341,7 +341,7 @@ def _log_to_wandb(loco_rows: list[dict], loco_metrics: list[str],
     )
 
     # Locomotion heatmap: own color bound (metric domain unrelated to sound).
-    loco_deltas = _delta_matrix(loco_rows, loco_metrics)
+    loco_deltas = _delta_matrix(loco_rows, loco_metrics, _BASELINE_LOCO)
     loco_vbound = float(np.nanmax(np.abs(loco_deltas)))
     wandb.log({"bench/delta_heatmap_locomotion": _heatmap(
         loco_deltas, loco_metrics, [r["scenario"] for r in loco_rows],
@@ -353,7 +353,7 @@ def _log_to_wandb(loco_rows: list[dict], loco_metrics: list[str],
     sound = []
     for leg, (rows, metric_names) in per_leg.items():
         metrics = [m for m in metric_names if not m.startswith("touchdown_count")]
-        sound.append((leg, rows, metrics, _delta_matrix(rows, metrics)))
+        sound.append((leg, rows, metrics, _delta_matrix(rows, metrics, _BASELINE_FEET[leg])))
     sound_vbound = float(np.nanmax(np.abs(np.concatenate([d.flatten() for _, _, _, d in sound]))))
     for leg, rows, metrics, deltas in sound:
         wandb.log({f"bench/delta_heatmap_sound_{leg}": _heatmap(
