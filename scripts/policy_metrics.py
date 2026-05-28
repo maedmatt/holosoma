@@ -36,19 +36,52 @@ _FZ_PEAK_WINDOW = 12
 
 # Baseline for the delta-vs-baseline heatmap. fastsac, symmetry off, flat terrain.
 # Source: https://wandb.ai/matteo-calabria01-maedmatt/IDSIA/runs/60zwuqkq
+# Measured on asad (RTX 4090) at num_envs=64 with randomization:g1-benchmark, so the
+# deltas are only meaningful for policies benched on the same hardware + config.
+# vyaw on non-yaw and vxy on yaw scenarios are NaN.
 _BASELINE_NAME = "fastsac_no_symm_flat_60zwuqkq"
-_BASELINE = {
-    "forward_03":   {"vxy_rmse": 0.1722, "vyaw_rmse": 0.1332, "touchdown_vz_peak": 0.8926, "touchdown_vz_rms": 0.8666, "fz_peak_at_touchdown_mean": 1007.82, "action_rate_rms": 21.3010, "body_accel_rms": 3.8982},
-    "forward_06":   {"vxy_rmse": 0.1964, "vyaw_rmse": 0.1349, "touchdown_vz_peak": 0.9591, "touchdown_vz_rms": 0.8744, "fz_peak_at_touchdown_mean": 1017.78, "action_rate_rms": 22.4356, "body_accel_rms": 4.6619},
-    "forward_09":   {"vxy_rmse": 0.2712, "vyaw_rmse": 0.1771, "touchdown_vz_peak": 1.1099, "touchdown_vz_rms": 0.9448, "fz_peak_at_touchdown_mean": 1024.33, "action_rate_rms": 24.7324, "body_accel_rms": 5.5070},
-    "backward_03":  {"vxy_rmse": 0.1843, "vyaw_rmse": 0.1881, "touchdown_vz_peak": 1.0404, "touchdown_vz_rms": 0.9740, "fz_peak_at_touchdown_mean": 1300.63, "action_rate_rms": 21.2034, "body_accel_rms": 3.8724},
-    "backward_06":  {"vxy_rmse": 0.2465, "vyaw_rmse": 0.1802, "touchdown_vz_peak": 1.1827, "touchdown_vz_rms": 1.0797, "fz_peak_at_touchdown_mean": 1367.51, "action_rate_rms": 23.1583, "body_accel_rms": 4.1011},
-    "backward_09":  {"vxy_rmse": 0.3810, "vyaw_rmse": 0.1311, "touchdown_vz_peak": 1.2760, "touchdown_vz_rms": 1.2109, "fz_peak_at_touchdown_mean": 1499.52, "action_rate_rms": 25.6915, "body_accel_rms": 4.4746},
-    "strafe_left":  {"vxy_rmse": 0.2338, "vyaw_rmse": 0.1355, "touchdown_vz_peak": 0.9401, "touchdown_vz_rms": 0.9175, "fz_peak_at_touchdown_mean": 1107.19, "action_rate_rms": 21.1900, "body_accel_rms": 3.9158},
-    "strafe_right": {"vxy_rmse": 0.2219, "vyaw_rmse": 0.1365, "touchdown_vz_peak": 1.0245, "touchdown_vz_rms": 0.9088, "fz_peak_at_touchdown_mean": 1100.79, "action_rate_rms": 21.4351, "body_accel_rms": 3.8061},
-    "yaw_left":     {"vxy_rmse": 0.1677, "vyaw_rmse": 0.1266, "touchdown_vz_peak": 0.9460, "touchdown_vz_rms": 0.8656, "fz_peak_at_touchdown_mean": 1003.12, "action_rate_rms": 21.0539, "body_accel_rms": 3.6745},
-    "yaw_right":    {"vxy_rmse": 0.1725, "vyaw_rmse": 0.2016, "touchdown_vz_peak": 0.9490, "touchdown_vz_rms": 0.9104, "fz_peak_at_touchdown_mean": 1081.99, "action_rate_rms": 21.1834, "body_accel_rms": 3.7517},
-    "avg":          {"vxy_rmse": 0.2247, "vyaw_rmse": 0.1545, "touchdown_vz_peak": 1.0320, "touchdown_vz_rms": 0.9553, "fz_peak_at_touchdown_mean": 1151.07, "action_rate_rms": 22.3385, "body_accel_rms": 4.1663},
+
+_BASELINE_LOCO = {
+    "forward_03": {"vxy_rmse": 0.1768, "vyaw_rmse": float("nan"), "action_rate_rms": 21.6512, "body_accel_rms": 3.7693},
+    "forward_06": {"vxy_rmse": 0.2028, "vyaw_rmse": float("nan"), "action_rate_rms": 22.8564, "body_accel_rms": 4.4909},
+    "forward_09": {"vxy_rmse": 0.2775, "vyaw_rmse": float("nan"), "action_rate_rms": 25.1960, "body_accel_rms": 5.3152},
+    "backward_03": {"vxy_rmse": 0.1834, "vyaw_rmse": float("nan"), "action_rate_rms": 21.7099, "body_accel_rms": 3.7810},
+    "backward_06": {"vxy_rmse": 0.2430, "vyaw_rmse": float("nan"), "action_rate_rms": 23.9675, "body_accel_rms": 4.1419},
+    "backward_09": {"vxy_rmse": 0.3707, "vyaw_rmse": float("nan"), "action_rate_rms": 26.6577, "body_accel_rms": 4.5440},
+    "strafe_left": {"vxy_rmse": 0.2273, "vyaw_rmse": float("nan"), "action_rate_rms": 21.5647, "body_accel_rms": 3.8056},
+    "strafe_right": {"vxy_rmse": 0.2150, "vyaw_rmse": float("nan"), "action_rate_rms": 21.7422, "body_accel_rms": 3.6762},
+    "yaw_left": {"vxy_rmse": float("nan"), "vyaw_rmse": 0.1560, "action_rate_rms": 21.4068, "body_accel_rms": 3.5295},
+    "yaw_right": {"vxy_rmse": float("nan"), "vyaw_rmse": 0.1535, "action_rate_rms": 21.4800, "body_accel_rms": 3.6628},
+    "avg": {"vxy_rmse": 0.2371, "vyaw_rmse": 0.1548, "action_rate_rms": 22.8232, "body_accel_rms": 4.0717},
+}
+
+_BASELINE_FEET = {
+    "left": {
+        "forward_03": {"touchdown_vz_peak": 0.8708, "touchdown_vz_rms": 0.8363, "fz_peak_at_touchdown_mean": 987.8217},
+        "forward_06": {"touchdown_vz_peak": 0.9359, "touchdown_vz_rms": 0.8861, "fz_peak_at_touchdown_mean": 1004.0168},
+        "forward_09": {"touchdown_vz_peak": 1.0834, "touchdown_vz_rms": 0.9910, "fz_peak_at_touchdown_mean": 981.8250},
+        "backward_03": {"touchdown_vz_peak": 1.0286, "touchdown_vz_rms": 0.9705, "fz_peak_at_touchdown_mean": 1273.8926},
+        "backward_06": {"touchdown_vz_peak": 1.1495, "touchdown_vz_rms": 1.0961, "fz_peak_at_touchdown_mean": 1396.6360},
+        "backward_09": {"touchdown_vz_peak": 1.2242, "touchdown_vz_rms": 1.1696, "fz_peak_at_touchdown_mean": 1441.5125},
+        "strafe_left": {"touchdown_vz_peak": 0.9134, "touchdown_vz_rms": 0.8878, "fz_peak_at_touchdown_mean": 983.1581},
+        "strafe_right": {"touchdown_vz_peak": 0.9093, "touchdown_vz_rms": 0.8849, "fz_peak_at_touchdown_mean": 1241.2446},
+        "yaw_left": {"touchdown_vz_peak": 0.9014, "touchdown_vz_rms": 0.8737, "fz_peak_at_touchdown_mean": 1102.6381},
+        "yaw_right": {"touchdown_vz_peak": 0.9019, "touchdown_vz_rms": 0.8697, "fz_peak_at_touchdown_mean": 1099.4073},
+        "avg": {"touchdown_vz_peak": 0.9918, "touchdown_vz_rms": 0.9466, "fz_peak_at_touchdown_mean": 1151.2153},
+    },
+    "right": {
+        "forward_03": {"touchdown_vz_peak": 0.8990, "touchdown_vz_rms": 0.8665, "fz_peak_at_touchdown_mean": 1056.8723},
+        "forward_06": {"touchdown_vz_peak": 0.9022, "touchdown_vz_rms": 0.8510, "fz_peak_at_touchdown_mean": 1044.9713},
+        "forward_09": {"touchdown_vz_peak": 0.9185, "touchdown_vz_rms": 0.8424, "fz_peak_at_touchdown_mean": 973.8061},
+        "backward_03": {"touchdown_vz_peak": 1.0396, "touchdown_vz_rms": 0.9923, "fz_peak_at_touchdown_mean": 1305.5843},
+        "backward_06": {"touchdown_vz_peak": 1.1604, "touchdown_vz_rms": 1.1178, "fz_peak_at_touchdown_mean": 1475.3032},
+        "backward_09": {"touchdown_vz_peak": 1.2848, "touchdown_vz_rms": 1.2527, "fz_peak_at_touchdown_mean": 1636.3417},
+        "strafe_left": {"touchdown_vz_peak": 0.9341, "touchdown_vz_rms": 0.8965, "fz_peak_at_touchdown_mean": 1225.1722},
+        "strafe_right": {"touchdown_vz_peak": 0.9976, "touchdown_vz_rms": 0.9443, "fz_peak_at_touchdown_mean": 947.6439},
+        "yaw_left": {"touchdown_vz_peak": 0.9446, "touchdown_vz_rms": 0.8915, "fz_peak_at_touchdown_mean": 992.8493},
+        "yaw_right": {"touchdown_vz_peak": 0.9601, "touchdown_vz_rms": 0.9132, "fz_peak_at_touchdown_mean": 1157.8676},
+        "avg": {"touchdown_vz_peak": 1.0041, "touchdown_vz_rms": 0.9568, "fz_peak_at_touchdown_mean": 1181.6412},
+    },
 }
 
 def _mask_tracking_drift(row: dict, cmd: np.ndarray) -> None:
@@ -264,12 +297,12 @@ def render_markdown(rows_mean: list[dict], rows_std: list[dict], metric_names: l
     return "\n".join(lines)
 
 
-def _delta_matrix(rows: list[dict], metrics: list[str]) -> np.ndarray:
-    """Percent delta of each (scenario, metric) cell vs `_BASELINE`. NaN where masked."""
+def _delta_matrix(rows: list[dict], metrics: list[str], baseline: dict) -> np.ndarray:
+    """Percent delta of each (scenario, metric) cell vs `baseline`. NaN where masked."""
     deltas = np.empty((len(rows), len(metrics)))
     for i, r in enumerate(rows):
         for j, m in enumerate(metrics):
-            base = _BASELINE[r["scenario"]][m]
+            base = baseline[r["scenario"]][m]
             deltas[i, j] = (r[m] - base) / base * 100.0  # NaN-in (masked) propagates
     return deltas
 
