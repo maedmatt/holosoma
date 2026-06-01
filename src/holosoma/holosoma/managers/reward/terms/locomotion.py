@@ -112,30 +112,6 @@ def penalty_feet_ori(env: LeggedRobotLocomotionManager) -> torch.Tensor:
         + torch.sum(torch.square(right_gravity[:, :2]), dim=1) ** 0.5
     )
 
-
-def penalty_feet_impact(env: LeggedRobotLocomotionManager) -> torch.Tensor:
-    """Penalize foot vertical velocity at moments of ground contact.
-
-    Sums foot z-velocity squared over both feet, gated by contact (z-force > 1.0 N).
-    Targets the impact event (kinetic energy at touchdown) without fighting
-    swing-phase foot motion. Same contact gate as penalty_foothold below.
-    """
-    foot_vel_z = env.simulator._rigid_body_vel[:, env.feet_indices, 2]
-    contact = env.simulator.contact_forces[:, env.feet_indices, 2] > 1.0
-    return torch.sum(foot_vel_z.square() * contact.float(), dim=1)
-
-
-def penalty_feet_velocity(env: LeggedRobotLocomotionManager) -> torch.Tensor:
-    """Penalize foot 3D linear velocity (QuietWalk formulation).
-
-    Sums squared 3D velocity of both feet every step (no contact gating).
-    Dense signal that pushes the policy toward globally slower foot motion,
-    capturing lateral skid at touchdown as well as vertical impact.
-    """
-    foot_vel = env.simulator._rigid_body_vel[:, env.feet_indices, :]
-    return torch.sum(foot_vel.square(), dim=(1, 2))
-
-
 class NoisePredictorPenalty(RewardTermBase):
     """Predicted-loudness penalty with a linear post-touchdown discount.
 
@@ -149,7 +125,7 @@ class NoisePredictorPenalty(RewardTermBase):
         ckpt = cfg.params["noise_predictor_ckpt"]
         self._predictor = BatchedNoisePredictor(ckpt, num_envs=env.num_envs, device=env.device)
         self._detector = TouchdownDetector(num_envs=env.num_envs, num_feet=len(env.feet_indices))
-        self._gate_window = int(cfg.params.get("gate_window", 5))
+        self._gate_window = int(cfg.params.get("gate_window", 1))
         self._value_at_touchdown = torch.zeros(env.num_envs, device=env.device)
         self._discount = torch.zeros(env.num_envs, device=env.device)
         self._vz_prev = torch.zeros(env.num_envs, len(env.feet_indices), device=env.device)
