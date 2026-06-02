@@ -170,6 +170,7 @@ class BatchedNoisePredictor:
         self.num_envs = num_envs
         self.model, self._n_steps, self._n_base, self._gather = _load_predictor(checkpoint_path, device)
         self.n_outputs = int(self.model.head.bias.shape[0])
+        self.last_clamp_frac = torch.zeros((), device=device)
         self._buffer = torch.zeros((num_envs, self._n_steps, self._n_base), device=device)
         self._n_filled = torch.zeros(num_envs, dtype=torch.long, device=device)
         logger.info(
@@ -209,4 +210,7 @@ class BatchedNoisePredictor:
         # locosonic's [feat0@t-k, ..., feat0@t, feat1@t-k, ...] packing.
         x = self._buffer.transpose(1, 2).reshape(self.num_envs, -1)
         with torch.no_grad():
+            # Fraction of inputs beyond the model's own ±5 z-score clamp = OOD rate.
+            z = (x - self.model.input_mean) / self.model.input_std
+            self.last_clamp_frac = (z.abs() >= 5.0).float().mean()
             return self.model(x)
