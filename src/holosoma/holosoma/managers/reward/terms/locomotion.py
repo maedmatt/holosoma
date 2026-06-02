@@ -148,7 +148,8 @@ class NoisePredictorPenalty(RewardTermBase):
         env.log_dict["noise/raw_out_mean"] = raw_out.mean()
         env.log_dict["noise/raw_out_std"] = raw_out.std()
         env.log_dict["noise/neg_rate"] = (raw_out < 0).float().mean()
-        env.log_dict["noise/gate_rate"] = fired.float().mean()
+        env.log_dict["noise/predictor_clamp_rate"] = self._predictor.last_clamp_frac
+        env.log_dict["noise/touchdown_rate"] = fired.float().mean()
         env.log_dict["noise/fz_at_fire"] = torch.where(fired_per_foot, fz, nan).nanmean()
         env.log_dict["noise/vz_at_pre"] = torch.where(fired_per_foot, self._vz_prev, nan).nanmean()
 
