@@ -38,3 +38,9 @@ src/holosoma/holosoma/data/robots/converted_rank*/
 __pycache__
 .claude
 data/
+# keep the robot models tracked (the rest of this data/ tree stays ignored)
+!/src/holosoma/holosoma/data/
+/src/holosoma/holosoma/data/*
+!/src/holosoma/holosoma/data/robots/
+/src/holosoma/holosoma/data/robots/converted/
+/src/holosoma/holosoma/data/robots/converted_rank*/
