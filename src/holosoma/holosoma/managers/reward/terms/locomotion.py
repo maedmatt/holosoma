@@ -146,6 +146,29 @@ class NoisePredictorPenalty(RewardTermBase):
         return torch.where(apply, raw_out_clamped, torch.zeros_like(raw_out_clamped))
 
 
+class TouchdownSpeedPenalty(RewardTermBase):
+    """Penalize downward foot speed in excess of target, sampled just before touchdown.
+
+    Quadratic on the excess of env.foot_state.approach_speed over
+    target_downward_speed, applied on the step a touchdown fires, summed over
+    feet. Foot/impact diagnostics come from the feet/ (FootState) logs; the
+    per-term contribution is logged by the reward manager as Episode/rew_*.
+    """
+
+    def __init__(self, cfg: RewardTermCfg, env: Any) -> None:
+        super().__init__(cfg, env)
+
+    def reset(self, env_ids: torch.Tensor | None = None) -> None:
+        pass
+
+    def __call__(self, env: Any, **kwargs: Any) -> torch.Tensor:
+        target_downward_speed = float(kwargs.get("target_downward_speed", 0.25))
+        foot_state = env.foot_state
+        excess = (foot_state.approach_speed - target_downward_speed).clamp(min=0.0)
+        per_foot = torch.where(foot_state.fired, excess.square(), torch.zeros_like(excess))
+        return per_foot.sum(dim=1)
+
+
 # ================================================================================================
 # Limit Rewards
 # ================================================================================================

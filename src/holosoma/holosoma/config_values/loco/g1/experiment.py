@@ -55,16 +55,28 @@ g1_23dof_fast_sac = ExperimentConfig(
     ),
 )
 
+g1_23dof_quiet = replace(
+    g1_23dof,
+    training=TrainingConfig(project="hv-g1-manager", name="g1_23dof_quiet_manager"),
+    reward=reward.g1_23dof_loco_quiet,
+)
+
+g1_23dof_quiet_touchdown = replace(
+    g1_23dof_quiet,
+    training=TrainingConfig(project="IDSIA", name="g1_23dof_quiet_touchdown"),
+    reward=reward.g1_23dof_loco_quiet_touchdown,
+)
+
 g1_23dof_quiet_fast_sac = replace(
     g1_23dof_fast_sac,
     training=TrainingConfig(project="hv-g1-manager", name="g1_23dof_quiet_fast_sac_manager"),
     reward=reward.g1_23dof_loco_quiet_fast_sac,
 )
 
-g1_23dof_quiet = replace(
-    g1_23dof,
-    training=TrainingConfig(project="hv-g1-manager", name="g1_23dof_quiet_manager"),
-    reward=reward.g1_23dof_loco_quiet,
+g1_23dof_quiet_touchdown_fast_sac = replace(
+    g1_23dof_quiet_fast_sac,
+    training=TrainingConfig(project="IDSIA", name="g1_23dof_quiet_touchdown_fast_sac"),
+    reward=reward.g1_23dof_loco_quiet_touchdown_fast_sac,
 )
 
 g1_29dof = ExperimentConfig(
@@ -109,9 +121,11 @@ g1_29dof_fast_sac = ExperimentConfig(
 
 __all__ = [
     "g1_23dof",
-    "g1_23dof_fast_sac",
     "g1_23dof_quiet",
+    "g1_23dof_quiet_touchdown",
+    "g1_23dof_fast_sac",
     "g1_23dof_quiet_fast_sac",
+    "g1_23dof_quiet_touchdown_fast_sac",
     "g1_29dof",
     "g1_29dof_fast_sac",
 ]
