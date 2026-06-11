@@ -17,7 +17,7 @@ from holosoma.config_values import (
 
 g1_23dof = ExperimentConfig(
     env_class="holosoma.envs.locomotion.locomotion_manager.LeggedRobotLocomotionManager",
-    training=TrainingConfig(project="hv-g1-manager", name="g1_23dof_manager"),
+    training=TrainingConfig(project="IDSIA", name="g1_23dof"),
     algo=replace(algo.ppo, config=replace(algo.ppo.config, num_learning_iterations=25000, use_symmetry=True)),
     simulator=simulator.isaacgym,
     robot=robot.g1_23dof,
@@ -37,7 +37,7 @@ g1_23dof = ExperimentConfig(
 
 g1_23dof_fast_sac = ExperimentConfig(
     env_class="holosoma.envs.locomotion.locomotion_manager.LeggedRobotLocomotionManager",
-    training=TrainingConfig(project="hv-g1-manager", name="g1_23dof_fast_sac_manager"),
+    training=TrainingConfig(project="IDSIA", name="g1_23dof_fast_sac"),
     algo=replace(algo.fast_sac, config=replace(algo.fast_sac.config, num_learning_iterations=50000, use_symmetry=True)),
     simulator=simulator.isaacgym,
     robot=robot.g1_23dof,
@@ -57,7 +57,7 @@ g1_23dof_fast_sac = ExperimentConfig(
 
 g1_23dof_quiet = replace(
     g1_23dof,
-    training=TrainingConfig(project="hv-g1-manager", name="g1_23dof_quiet_manager"),
+    training=TrainingConfig(project="IDSIA", name="g1_23dof_quiet"),
     reward=reward.g1_23dof_loco_quiet,
 )
 
@@ -69,7 +69,7 @@ g1_23dof_quiet_touchdown = replace(
 
 g1_23dof_quiet_fast_sac = replace(
     g1_23dof_fast_sac,
-    training=TrainingConfig(project="hv-g1-manager", name="g1_23dof_quiet_fast_sac_manager"),
+    training=TrainingConfig(project="IDSIA", name="g1_23dof_quiet_fast_sac"),
     reward=reward.g1_23dof_loco_quiet_fast_sac,
 )
 
