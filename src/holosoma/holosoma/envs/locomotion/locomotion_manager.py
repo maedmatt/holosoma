@@ -3,6 +3,7 @@ from __future__ import annotations
 from loguru import logger
 
 from holosoma.envs.base_task.base_task import BaseTask
+from holosoma.utils.foot_state import FootState
 from holosoma.utils.safe_torch_import import torch
 from holosoma.utils.torch_utils import torch_rand_float
 
@@ -54,11 +55,25 @@ class LeggedRobotLocomotionManager(BaseTask):
 
         self.lidar_height_offset = getattr(self.robot_config, "lidar_height_offset", 0.5)
 
+        self.foot_state = FootState(
+            num_envs=self.num_envs,
+            num_feet=len(self.feet_indices),
+            dt=self.dt,
+            device=self.device,
+        )
+
     def _init_counters(self):
         self.common_step_counter = 0
 
     def _update_counters_each_step(self):
         self.common_step_counter += 1
+        # Once per control step, before termination/rewards, so reward terms
+        # read this step's foot signals. Not in _pre_compute_observations_callback,
+        # which also runs from _refresh_envs_after_reset (would double-step).
+        self.foot_state.step(
+            self.simulator._rigid_body_vel[:, self.feet_indices, 2],
+            self.simulator.contact_forces[:, self.feet_indices, 2],
+        )
 
     def _init_domain_rand_buffers(self):
         ######################################### DR related tensors #########################################
@@ -161,6 +176,7 @@ class LeggedRobotLocomotionManager(BaseTask):
     def _reset_buffers_callback(self, env_ids, target_buf=None):
         # Observation manager reset is now handled in base_task.py
         self.need_to_refresh_envs[env_ids] = True
+        self.foot_state.reset(env_ids)
 
         if target_buf is not None:
             self.simulator.dof_pos[env_ids] = target_buf["dof_pos"].to(self.simulator.dof_pos.dtype)
@@ -179,6 +195,7 @@ class LeggedRobotLocomotionManager(BaseTask):
     def _update_log_dict(self):
         avg = self._get_average_episode_tracker().get_average()
         self.log_dict["average_episode_length"] = avg.detach().cpu()
+        self.foot_state.log(self.log_dict)
 
     ################ Curriculum #################
 
