@@ -23,7 +23,6 @@ from holosoma.utils.rotations import (
     quat_rotate_inverse,
 )
 from holosoma.utils.safe_torch_import import torch
-from holosoma.utils.touchdown import TouchdownDetector
 
 if TYPE_CHECKING:
     from holosoma.config_types.reward import RewardTermCfg
@@ -113,49 +112,38 @@ def penalty_feet_ori(env: LeggedRobotLocomotionManager) -> torch.Tensor:
     )
 
 class NoisePredictorPenalty(RewardTermBase):
-    """Dense predicted-loudness penalty: applies the predictor's output every step.
+    """Predicted-loudness penalty.
 
-    The predictor (cfg.params["noise_predictor_ckpt"]) is trained on all gait
-    phases, so it is queried at every ready step (zero during buffer warm-up).
-    The touchdown detector is kept only for impact diagnostics in the logs.
+    The mode follows the checkpoint (cfg.params["noise_predictor_ckpt"]):
+    dense models (trained on all data) apply their output at every ready step;
+    peak-only models (trained just on impacts) are only valid at touchdown, so
+    their output is gated to steps where env.foot_state fires. No other gating:
+    state-conditioned gates (e.g. upright checks) are exploitable in training.
+    Foot/impact diagnostics live in env.foot_state (feet/ logs), not here.
     """
 
     def __init__(self, cfg: RewardTermCfg, env: Any) -> None:
         super().__init__(cfg, env)
         ckpt = cfg.params["noise_predictor_ckpt"]
         self._predictor = BatchedNoisePredictor(ckpt, num_envs=env.num_envs, device=env.device)
-        self._detector = TouchdownDetector(num_envs=env.num_envs, num_feet=len(env.feet_indices))
-        self._vz_prev = torch.zeros(env.num_envs, len(env.feet_indices), device=env.device)
 
     def reset(self, env_ids: torch.Tensor | None = None) -> None:
         self._predictor.reset(env_ids)
-        self._detector.reset(env_ids)
-        if env_ids is None:
-            self._vz_prev.zero_()
-        else:
-            self._vz_prev[env_ids] = 0.0
 
     def __call__(self, env: Any, **kwargs: Any) -> torch.Tensor:
         ready = self._predictor.update_buffer(env)
-        vz = env.simulator._rigid_body_vel[:, env.feet_indices, 2]
-        fz = env.simulator.contact_forces[:, env.feet_indices, 2]
-        fired_per_foot = self._detector.step(vz, fz)
-        fired = ready & fired_per_foot.any(dim=1)
         raw_out = self._predictor.forward()[:, 0]
         raw_out_clamped = raw_out.clamp(min=0.0)
 
-        nan = torch.full_like(fz, float("nan"))
         env.log_dict["noise/raw_out_mean"] = raw_out.mean()
         env.log_dict["noise/raw_out_std"] = raw_out.std()
         env.log_dict["noise/neg_rate"] = (raw_out < 0).float().mean()
         env.log_dict["noise/predictor_clamp_rate"] = self._predictor.last_clamp_frac
-        env.log_dict["noise/touchdown_rate"] = fired.float().mean()
-        env.log_dict["noise/fz_at_fire"] = torch.where(fired_per_foot, fz, nan).nanmean()
-        env.log_dict["noise/vz_at_pre"] = torch.where(fired_per_foot, self._vz_prev, nan).nanmean()
 
-        # Save at the end: next step's `vz_at_pre` reads this step's vz (the sample just before fire).
-        self._vz_prev = vz
-        return torch.where(ready, raw_out_clamped, torch.zeros_like(raw_out_clamped))
+        # Dense models are valid every ready step; peak-only models just at touchdown.
+        touchdown = env.foot_state.fired.any(dim=1)
+        apply = ready & (touchdown | self._predictor.dense)
+        return torch.where(apply, raw_out_clamped, torch.zeros_like(raw_out_clamped))
 
 
 # ================================================================================================
