@@ -25,7 +25,7 @@ def _step(state: FootState, vz_left: float, fz_left: float) -> dict:
     return log
 
 
-def test_touchdown_fires_and_captures_pre_fire_velocity() -> None:
+def test_touchdown_fires_and_captures_pre_touchdown_velocity() -> None:
     state = _make_state()
 
     log = _step(state, vz_left=-0.8, fz_left=0.0)
@@ -36,17 +36,17 @@ def test_touchdown_fires_and_captures_pre_fire_velocity() -> None:
     assert state.vz_pre[0, 0].item() == pytest.approx(-0.8)
     assert state.approach_speed[0, 0].item() == pytest.approx(0.8)
     assert log["feet/touchdown_rate"].item() == 1.0
-    assert log["feet/touchdown_foot_rate"].item() == 0.5
-    assert log["feet/vz_at_pre"].item() == pytest.approx(-0.8)
-    assert log["feet/approach_speed"].item() == pytest.approx(0.8)
-    assert log["feet/fz_at_fire"].item() == 2.0
+    assert log["feet/pre_touchdown_vz"].item() == pytest.approx(-0.8)
+    assert log["feet/pre_touchdown_vz_std"].item() == pytest.approx(0.0)  # single event
+    assert log["feet/touchdown_fz"].item() == 2.0
     assert log["feet/contact_rate"].item() == 0.5
-    assert log["feet/contact_duration_s"].item() == pytest.approx(DT)
-    assert log["feet/left_vz_at_pre"].item() == pytest.approx(-0.8)
-    assert math.isnan(log["feet/right_vz_at_pre"].item())
+    assert log["feet/pre_touchdown_vz_left"].item() == pytest.approx(-0.8)
+    assert math.isnan(log["feet/pre_touchdown_vz_right"].item())
+    assert log["feet/touchdown_fz_left"].item() == 2.0
+    assert math.isnan(log["feet/touchdown_fz_right"].item())
 
 
-def test_reset_clears_detector_and_pre_fire_buffer() -> None:
+def test_reset_clears_detector_and_pre_touchdown_buffer() -> None:
     state = _make_state()
 
     _step(state, vz_left=-0.8, fz_left=0.0)
@@ -56,7 +56,7 @@ def test_reset_clears_detector_and_pre_fire_buffer() -> None:
     assert not state.fired.any()
     assert state.vz_pre[0, 0].item() == 0.0
     assert log["feet/touchdown_rate"].item() == 0.0
-    assert math.isnan(log["feet/vz_at_pre"].item())
+    assert math.isnan(log["feet/pre_touchdown_vz"].item())
 
 
 def test_reset_with_env_ids_clears_only_those_envs() -> None:
@@ -81,10 +81,21 @@ def test_no_event_logs_zero_rates() -> None:
 
     assert log["feet/touchdown_rate"].item() == 0.0
     assert log["feet/contact_rate"].item() == 0.0
-    assert log["feet/active_force_window_rate"].item() == 0.0
+    assert math.isnan(log["feet/stance_time_s"].item())
 
 
-def test_force_window_logs_deferral_observability() -> None:
+def test_stance_time_logged_at_liftoff() -> None:
+    state = _make_state()
+
+    _step(state, vz_left=-0.8, fz_left=0.0)
+    _step(state, vz_left=-0.1, fz_left=2.0)  # contact begins
+    _step(state, vz_left=-0.1, fz_left=2.0)  # held
+    log = _step(state, vz_left=-0.1, fz_left=0.0)  # liftoff
+
+    assert log["feet/stance_time_s"].item() == pytest.approx(2 * DT)
+
+
+def test_force_window_logs_peak_impulse_ratio() -> None:
     state = _make_state()
 
     _step(state, vz_left=-0.8, fz_left=0.0)
@@ -94,4 +105,4 @@ def test_force_window_logs_deferral_observability() -> None:
 
     assert log["feet/fz_peak_60ms"].item() == 10.0
     assert log["feet/impulse_60ms"].item() == pytest.approx(0.4)
-    assert log["feet/force_deferral_ratio_60ms"].item() == 5.0
+    assert log["feet/fz_peak_ratio_60ms"].item() == 5.0

@@ -107,30 +107,33 @@ class FootState:
         self._vz_prev = vz
 
     def log(self, log_dict: dict) -> None:
-        """Write the feet/ metrics for the current step into log_dict."""
+        """Write the feet/ metrics for the current step into log_dict.
+
+        Event timeline per touchdown: pre_touchdown_vz is sampled one step
+        before the fire (last free-flight velocity), touchdown_fz at the fire
+        step, and the fz_peak/impulse/ratio over the 60ms window after it.
+        """
         nan = torch.full_like(self.fz, float("nan"))
         label = self._window_label
         log_dict["feet/touchdown_rate"] = self.fired.any(dim=1).float().mean()
-        log_dict["feet/touchdown_foot_rate"] = self.fired.float().mean()
-        log_dict["feet/vz_at_pre"] = torch.where(self.fired, self.vz_pre, nan).nanmean()
-        log_dict["feet/approach_speed"] = torch.where(self.fired, self.approach_speed, nan).nanmean()
-        log_dict["feet/fz_at_fire"] = torch.where(self.fired, self.fz, nan).nanmean()
+        vz_events = torch.where(self.fired, self.vz_pre, nan)
+        vz_mean = vz_events.nanmean()
+        log_dict["feet/pre_touchdown_vz"] = vz_mean
+        # spread across touchdowns: the slam tail can worsen while the mean improves
+        log_dict["feet/pre_touchdown_vz_std"] = (vz_events - vz_mean).square().nanmean().sqrt()
+        log_dict["feet/touchdown_fz"] = torch.where(self.fired, self.fz, nan).nanmean()
         log_dict["feet/contact_rate"] = self.contact.float().mean()
-        log_dict["feet/contact_duration_s"] = torch.where(self.contact, self.contact_duration_s, nan).nanmean()
-        log_dict["feet/contact_duration_at_liftoff_s"] = self._liftoff_duration_s.nanmean()
+        log_dict["feet/stance_time_s"] = self._liftoff_duration_s.nanmean()
         peak_to_initial = self._window_peak_fz / self._window_initial_fz.clamp(min=1e-3)
         log_dict[f"feet/fz_peak_{label}"] = torch.where(self._window_completed, self._window_peak_fz, nan).nanmean()
         log_dict[f"feet/impulse_{label}"] = torch.where(self._window_completed, self._window_impulse, nan).nanmean()
-        log_dict[f"feet/force_deferral_ratio_{label}"] = torch.where(
-            self._window_completed, peak_to_initial, nan
-        ).nanmean()
-        log_dict["feet/active_force_window_rate"] = self._window_active.float().mean()
+        log_dict[f"feet/fz_peak_ratio_{label}"] = torch.where(self._window_completed, peak_to_initial, nan).nanmean()
         if self.fz.shape[1] >= 2:
             left, right = self.fired[:, 0], self.fired[:, 1]
-            log_dict["feet/left_vz_at_pre"] = torch.where(left, self.vz_pre[:, 0], nan[:, 0]).nanmean()
-            log_dict["feet/right_vz_at_pre"] = torch.where(right, self.vz_pre[:, 1], nan[:, 1]).nanmean()
-            log_dict["feet/left_fz_at_fire"] = torch.where(left, self.fz[:, 0], nan[:, 0]).nanmean()
-            log_dict["feet/right_fz_at_fire"] = torch.where(right, self.fz[:, 1], nan[:, 1]).nanmean()
+            log_dict["feet/pre_touchdown_vz_left"] = torch.where(left, self.vz_pre[:, 0], nan[:, 0]).nanmean()
+            log_dict["feet/pre_touchdown_vz_right"] = torch.where(right, self.vz_pre[:, 1], nan[:, 1]).nanmean()
+            log_dict["feet/touchdown_fz_left"] = torch.where(left, self.fz[:, 0], nan[:, 0]).nanmean()
+            log_dict["feet/touchdown_fz_right"] = torch.where(right, self.fz[:, 1], nan[:, 1]).nanmean()
 
     def reset(self, env_ids: Tensor | None = None) -> None:
         """Clear per-foot state. None = all envs; tensor = those envs only."""
