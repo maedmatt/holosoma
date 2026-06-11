@@ -868,6 +868,14 @@ class PPO(BaseAlgo):
             actor_state = self.env_step(actor_state)
             actor_state = self._post_eval_env_step(actor_state)
 
+            # Mirror FastSAC: an eval callback (policy_eval) requests a reset at
+            # scenario boundaries so each scenario starts from the same pose.
+            # PPO reuses one actor_state dict across steps (FastSAC rebuilds it
+            # per iteration, so its flag self-clears); clear it here after reset.
+            if actor_state.get("eval_reset_request", False):
+                actor_state["obs"] = self.env.reset_all()
+                actor_state["eval_reset_request"] = False
+
         self._post_evaluate_policy()
 
     def _create_actor_state(self):
