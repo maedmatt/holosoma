@@ -172,8 +172,14 @@ class NoisePredictorCallback(RLEvalCallback):
         gravity_b = get_projected_gravity(env)[eid]
         upright = base_z > self.UPRIGHT_BASE_Z_MIN and float(gravity_b[2]) < self.UPRIGHT_GRAV_Z_MAX
 
-        is_impact = (fired_l or fired_r) and upright
-        value = float(self._predictor.forward()[0]) if is_impact else 0.0
+        touchdown = fired_l or fired_r
+        is_impact = touchdown and upright
+        # Dense models are valid every step; peak-only models just at touchdown.
+        # The upright gate is display-only (suppress garbage while fallen) and
+        # must never move into a training reward: the robot learns to crouch
+        # under the pelvis-z threshold to mute the penalty.
+        show_prediction = upright and (self._predictor.dense or touchdown)
+        value = float(self._predictor.forward()[0]) if show_prediction else 0.0
 
         t = self._step / self.POLICY_HZ
         self._log.append(

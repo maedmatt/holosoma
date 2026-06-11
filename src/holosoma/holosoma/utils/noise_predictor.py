@@ -49,11 +49,13 @@ class _Model(nn.Module):
 
 def _load_predictor(
     checkpoint_path: str | Path, device: torch.device
-) -> tuple[_Model, int, int, dict[str, tuple[Tensor, Tensor]]]:
-    """Load a locosonic predictor checkpoint and return (model, n_steps, n_base, gather).
+) -> tuple[_Model, int, int, dict[str, tuple[Tensor, Tensor]], bool]:
+    """Load a locosonic predictor checkpoint and return (model, n_steps, n_base, gather, dense).
 
     `gather` maps a source name ("dof_pos", "dof_vel", "cmd") to a (dst_slots, src_idx)
     pair: which base-feature slots come from that source, and at which source indices.
+    `dense` is True for models trained on all data (valid at every step); False for
+    peak-only models (valid only at touchdown), read from the checkpoint's dataset_meta.
     """
     ckpt = torch.load(Path(checkpoint_path), map_location=device, weights_only=False)
     names: list[str] = ckpt["input_feature_names"]
@@ -90,7 +92,8 @@ def _load_predictor(
     model.to(device).eval()
     for p in model.parameters():
         p.requires_grad_(False)
-    return model, n_steps, n_base, gather
+    dense = ckpt["dataset_meta"]["n_quiet"] > 0
+    return model, n_steps, n_base, gather, dense
 
 
 def _parse_name(name: str) -> tuple[str, int, int]:
@@ -123,11 +126,11 @@ class NoisePredictor:
 
     def __init__(self, checkpoint_path: str | Path, device: torch.device) -> None:
         self.device = device
-        self.model, self._n_steps, self._n_base, self._gather = _load_predictor(checkpoint_path, device)
+        self.model, self._n_steps, self._n_base, self._gather, self.dense = _load_predictor(checkpoint_path, device)
         self._buffer: deque[Tensor] = deque(maxlen=self._n_steps)
         logger.info(
             f"Noise predictor: {self._n_base} base features × {self._n_steps} steps "
-            f"= {self._n_base * self._n_steps} inputs"
+            f"= {self._n_base * self._n_steps} inputs, {'dense' if self.dense else 'peak-only'}"
         )
 
     def update_buffer(self, env: Any, env_id: int) -> bool:
@@ -168,14 +171,15 @@ class BatchedNoisePredictor:
     def __init__(self, checkpoint_path: str | Path, num_envs: int, device: torch.device) -> None:
         self.device = device
         self.num_envs = num_envs
-        self.model, self._n_steps, self._n_base, self._gather = _load_predictor(checkpoint_path, device)
+        self.model, self._n_steps, self._n_base, self._gather, self.dense = _load_predictor(checkpoint_path, device)
         self.n_outputs = int(self.model.head.bias.shape[0])
         self.last_clamp_frac = torch.zeros((), device=device)
         self._buffer = torch.zeros((num_envs, self._n_steps, self._n_base), device=device)
         self._n_filled = torch.zeros(num_envs, dtype=torch.long, device=device)
         logger.info(
             f"Batched noise predictor: {num_envs} envs × {self._n_base} base × {self._n_steps} steps "
-            f"= {self._n_base * self._n_steps} inputs, {self.n_outputs} outputs"
+            f"= {self._n_base * self._n_steps} inputs, {self.n_outputs} outputs, "
+            f"{'dense' if self.dense else 'peak-only'}"
         )
 
     def reset(self, env_ids: Tensor | None = None) -> None:
