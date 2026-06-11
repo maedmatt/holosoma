@@ -20,14 +20,6 @@ Thumbs.db
 logs
 logs_eval
 models/*
-# v11_sim_no_cmd_all36
-!models/v11_sim_no_cmd_all36/
-models/v11_sim_no_cmd_all36/*
-!models/v11_sim_no_cmd_all36/best.pt
-# v13_sim_windowed_sr1
-!models/v13_sim_windowed_sr1/
-models/v13_sim_windowed_sr1/*
-!models/v13_sim_windowed_sr1/best.pt
 
 # Isaacsim Converted Files
 src/holosoma/holosoma/data/robots/converted/
@@ -38,6 +30,7 @@ src/holosoma/holosoma/data/robots/converted_rank*/
 __pycache__
 .claude
 data/
+
 # keep the robot models tracked (the rest of this data/ tree stays ignored)
 !/src/holosoma/holosoma/data/
 /src/holosoma/holosoma/data/*
