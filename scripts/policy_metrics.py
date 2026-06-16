@@ -34,6 +34,25 @@ FEET = {"left": 0, "right": 1}
 # 12 substeps = 60 ms at 200 Hz. The fz peak can land several substeps after the touchdown firing instant.
 _FZ_PEAK_WINDOW = 12
 
+# Fall detection. Eval disables termination, so a fall is permanent: the robot stays
+# collapsed for the rest of the window. Flag an env that ends it low and tilted.
+# Healthy walking bottoms out ~0.70 m at < 0.15 tilt, so the margin is wide.
+FALL_HEIGHT = 0.45  # base z [m]
+FALL_TILT = 0.7  # |projected_gravity_xy|, ~44 deg lean
+_FALL_TAIL_S = 0.5  # average the window tail so a noisy frame can't flip the verdict
+_GRAVITY = np.array([0.0, 0.0, -1.0], dtype=np.float32)
+
+# Every scenario commands 30 s of motion, so a walking robot steps continuously (~55
+# touchdowns, both feet). Fewer than this is stumbling, not walking: its foot/effort
+# metrics measure a couple of lucky steps, not a gait, so they don't count.
+_MIN_STEPS = 10
+
+# Honest diagnostics, kept on for every env: tracking error and step count get WORSE
+# when the robot stands still (high error, ~0 steps), so they expose a frozen or
+# barely-walking policy instead of hiding it. Every other metric is "lower is better"
+# and gamed by not moving, so it is dropped for an env that didn't walk upright.
+_ALWAYS_ON = {"vxy_rmse", "vyaw_rmse", "touchdown_count"}
+
 # Baseline for the delta-vs-baseline heatmap. fastsac, symmetry off, flat terrain.
 # Source: https://wandb.ai/matteo-calabria01-maedmatt/IDSIA/runs/60zwuqkq
 # Measured on asad (RTX 4090) at num_envs=64 with randomization:g1-benchmark, so the
@@ -128,6 +147,20 @@ def quat_rotate_inverse(quat_xyzw: np.ndarray, vec: np.ndarray) -> np.ndarray:
     return a - b + c
 
 
+def detect_fallen(npz: dict, tail_steps: int) -> np.ndarray:
+    """Per-env boolean: did the env end the active window low and tilted?"""
+    active = npz["is_active"]
+    base_pos = npz["base_pos"][active]  # (T_active, num_envs, 3)
+    base_quat = npz["base_quat"][active]  # (T_active, num_envs, 4)
+    grav = np.broadcast_to(_GRAVITY, base_pos.reshape(-1, 3).shape)
+    grav_base = quat_rotate_inverse(base_quat.reshape(-1, 4), grav).reshape(base_pos.shape)
+    tilt = np.linalg.norm(grav_base[..., :2], axis=-1)  # (T_active, num_envs)
+    tail = max(1, tail_steps)
+    height_end = base_pos[-tail:, :, 2].mean(axis=0)
+    tilt_end = tilt[-tail:].mean(axis=0)
+    return (height_end < FALL_HEIGHT) & (tilt_end > FALL_TILT)
+
+
 def detect_touchdowns(vz: np.ndarray, fz: np.ndarray,
                       arm_vz: float = -0.3, fire_fz: float = 1.0) -> np.ndarray:
     """Touchdown indices for one foot.
@@ -144,6 +177,19 @@ def detect_touchdowns(vz: np.ndarray, fz: np.ndarray,
             events.append(i)
             armed = False
     return np.asarray(events, dtype=np.int64)
+
+
+def detect_walked(npz_hi: dict, num_envs: int) -> np.ndarray:
+    """Per-env boolean: did the robot step at a walking cadence in the active window?"""
+    active = npz_hi["is_active"]
+    walked = np.zeros(num_envs, dtype=bool)
+    for n in range(num_envs):
+        steps = 0
+        for foot in FEET.values():
+            td = detect_touchdowns(npz_hi["foot_vel"][:, n, foot, 2], npz_hi["foot_force"][:, n, foot, 2])
+            steps += int(np.count_nonzero(active[td]))
+        walked[n] = steps >= _MIN_STEPS
+    return walked
 
 
 def vxy_rmse(vel_body_xy: np.ndarray, cmd_xy: np.ndarray) -> float:
@@ -289,7 +335,9 @@ def render_markdown(rows_mean: list[dict], rows_std: list[dict], metric_names: l
         cells = [rm["scenario"]]
         for m in metric_names:
             mean = rm[m]
-            if np.isnan(mean):
+            if m.endswith("_rate"):
+                cells.append(f"{mean:.2f}")  # failure fraction (fall/nowalk); no ±std
+            elif np.isnan(mean):
                 cells.append("nan")
             else:
                 cells.append(f"{mean:.4f}±{rs[m]:.4f}")
@@ -302,6 +350,11 @@ def _delta_matrix(rows: list[dict], metrics: list[str], baseline: dict) -> np.nd
     deltas = np.empty((len(rows), len(metrics)))
     for i, r in enumerate(rows):
         for j, m in enumerate(metrics):
+            if m.endswith("_rate"):
+                # Failure rates have no baseline; show the absolute percent (0 = green,
+                # higher = redder), consistent with "positive delta = worse".
+                deltas[i, j] = r[m] * 100.0
+                continue
             base = baseline[r["scenario"]][m]
             deltas[i, j] = (r[m] - base) / base * 100.0  # NaN-in (masked) propagates
     return deltas
@@ -341,8 +394,11 @@ def _log_to_wandb(loco_rows: list[dict], loco_metrics: list[str],
     )
 
     # Locomotion heatmap: own color bound (metric domain unrelated to sound).
+    # The *_rate columns are absolute percents, not deltas; keep them out of the bound
+    # so a failed run's red column doesn't flatten the quality deltas (it just clips).
     loco_deltas = _delta_matrix(loco_rows, loco_metrics, _BASELINE_LOCO)
-    loco_vbound = float(np.nanmax(np.abs(loco_deltas)))
+    quality = np.array([not m.endswith("_rate") for m in loco_metrics])
+    loco_vbound = float(np.nanmax(np.abs(loco_deltas[:, quality])))
     wandb.log({"bench/delta_heatmap_locomotion": _heatmap(
         loco_deltas, loco_metrics, [r["scenario"] for r in loco_rows],
         title="Locomotion quality", vbound=loco_vbound,
@@ -376,6 +432,12 @@ def main(args: Args) -> None:
     print(f"# {args.policy_dir.name}  (num_envs={num_envs})")
 
     per_env_dump: dict[str, dict] = {}
+    tail_steps = int(round(_FALL_TAIL_S / dt))
+    # An env's metrics count only if it did the task: stayed upright AND actually
+    # stepped. One that fell or froze games every "lower is better" metric, so it is
+    # dropped from all of them; fall_rate / nowalk_rate report how many failed, and how.
+    fallen_by_scenario = {name: detect_fallen(lo, tail_steps) for name, lo, _ in scenarios}
+    walked_by_scenario = {name: detect_walked(hi, num_envs) for name, _, hi in scenarios}
 
     # Locomotion quality: tracking + smoothness, shared across legs.
     loco_mean = []
@@ -383,12 +445,19 @@ def main(args: Args) -> None:
     for name, lo, hi in scenarios:
         # cmd is broadcast across envs, so masking decision is identical across envs.
         cmd_for_mask = lo["cmd"][:, 0]
+        fallen, walked = fallen_by_scenario[name], walked_by_scenario[name]
+        valid = ~fallen & walked
         per_env = []
         for n in range(num_envs):
             row = _body_metrics(lo, hi, dt, sim_dt, env_idx=n)
             _mask_tracking_drift(row, cmd_for_mask)
+            if not valid[n]:  # failed the task: keep only the honest diagnostics
+                row = {k: (v if k in _ALWAYS_ON else float("nan")) for k, v in row.items()}
             per_env.append(row)
         mean, std = _aggregate(per_env)
+        mean["fall_rate"] = float(fallen.mean())
+        mean["nowalk_rate"] = float((~fallen & ~walked).mean())
+        std["fall_rate"] = std["nowalk_rate"] = float("nan")
         loco_mean.append({"scenario": name, **mean})
         loco_std.append({"scenario": name, **std})
         per_env_dump.setdefault(name, {})["locomotion"] = per_env
@@ -405,7 +474,14 @@ def main(args: Args) -> None:
         mean_rows = []
         std_rows = []
         for name, _, hi in scenarios:
-            per_env = [_foot_metrics(hi, idx, env_idx=n) for n in range(num_envs)]
+            fallen, walked = fallen_by_scenario[name], walked_by_scenario[name]
+            valid = ~fallen & walked
+            per_env = []
+            for n in range(num_envs):
+                row = _foot_metrics(hi, idx, env_idx=n)
+                if not valid[n]:  # failed the task: keep only the honest diagnostics
+                    row = {k: (v if k in _ALWAYS_ON else float("nan")) for k, v in row.items()}
+                per_env.append(row)
             mean, std = _aggregate(per_env)
             mean_rows.append({"scenario": name, **mean})
             std_rows.append({"scenario": name, **std})
