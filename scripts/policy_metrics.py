@@ -233,15 +233,16 @@ def touchdown_vz_rms(vz_at_td: np.ndarray) -> float:
     return float(np.sqrt(np.mean(vz_down**2)))
 
 
-def fz_peak_at_touchdown_mean(td_idx: np.ndarray, fz: np.ndarray) -> float:
-    """Mean peak vertical contact force in a window after each touchdown.
+def _peak_in_window(sig: np.ndarray, td_idx: np.ndarray) -> float:
+    """Mean over touchdowns of the peak of `sig` in the [i, i+window) impact window.
 
-    Reference: QuietWalk (arXiv:2604.23702).
+    The peak lands a few substeps after the firing instant, so window then max.
+    Used for every per-impact peak: fz (QuietWalk, arXiv:2604.23702), tangential
+    force, foot accel, loading rate. Skips events whose window starts past the end
+    (finite-diff signals are one sample shorter than the force/velocity traces).
     """
-    if len(td_idx) == 0:
-        return 0.0
-    peaks = np.array([fz[i : i + _FZ_PEAK_WINDOW].max() for i in td_idx])
-    return float(np.mean(peaks))
+    peaks = [sig[i : i + _FZ_PEAK_WINDOW].max() for i in td_idx if i < len(sig)]
+    return float(np.mean(peaks)) if peaks else 0.0
 
 
 def action_rate_rms(action: np.ndarray, dt: float) -> float:
@@ -259,20 +260,28 @@ def body_accel_rms(lin_vel_world: np.ndarray, dt: float) -> float:
     return float(np.sqrt(np.mean(np.sum(a**2, axis=-1))))
 
 
-def _foot_metrics(npz_hi: dict, foot_idx: int, env_idx: int) -> dict[str, float]:
+def _foot_metrics(npz_hi: dict, foot_idx: int, env_idx: int, sim_dt: float) -> dict[str, float]:
     """Touchdown-derived metrics for one foot on one env. Events outside is_active are dropped."""
-    vz = npz_hi["foot_vel"][:, env_idx, foot_idx, 2]
-    fz = npz_hi["foot_force"][:, env_idx, foot_idx, 2]
+    vel = npz_hi["foot_vel"][:, env_idx, foot_idx, :]      # (T, 3) world-frame foot velocity
+    force = npz_hi["foot_force"][:, env_idx, foot_idx, :]   # (T, 3) contact force
+    vz = vel[:, 2]
+    fz = force[:, 2]
     td = detect_touchdowns(vz, fz)
     td = td[npz_hi["is_active"][td]]
     # Approach velocity spans the threshold crossing: take the more downward of
     # {pre, post}; whichever is pre-impulse holds the actual impact speed.
     vz_at_td = np.minimum(vz[td - 1], vz[td])
+    # Finite-diff at 200 Hz: the impact shock and force loading rate are sub-20ms, so the
+    # 50 Hz control stream aliases them away. diff() returns T-1 samples (_peak_in_window guards).
+    foot_accel = np.linalg.norm(np.diff(vel, axis=0) / sim_dt, axis=-1)
+    loading_rate = np.diff(fz) / sim_dt
     return {
         "touchdown_count": float(len(td)),
         "touchdown_vz_peak": touchdown_vz_peak(vz_at_td),
         "touchdown_vz_rms": touchdown_vz_rms(vz_at_td),
-        "fz_peak_at_touchdown_mean": fz_peak_at_touchdown_mean(td, fz),
+        "fz_peak_at_touchdown_mean": _peak_in_window(fz, td),
+        "foot_accel_peak_at_touchdown_mean": _peak_in_window(foot_accel, td),
+        "loading_rate_peak_at_touchdown_mean": _peak_in_window(loading_rate, td),
     }
 
 
@@ -408,7 +417,10 @@ def _log_to_wandb(loco_rows: list[dict], loco_metrics: list[str],
     # drop it. Shared color bound across L/R so asymmetries are visually comparable.
     sound = []
     for leg, (rows, metric_names) in per_leg.items():
-        metrics = [m for m in metric_names if not m.startswith("touchdown_count")]
+        # Heatmap needs a baseline scalar per metric. New metrics still show in the
+        # markdown/CSV/JSON tables but are excluded here until _BASELINE_FEET is regenerated.
+        base = _BASELINE_FEET[leg]["avg"]
+        metrics = [m for m in metric_names if m in base and not m.startswith("touchdown_count")]
         sound.append((leg, rows, metrics, _delta_matrix(rows, metrics, _BASELINE_FEET[leg])))
     sound_vbound = float(np.nanmax(np.abs(np.concatenate([d.flatten() for _, _, _, d in sound]))))
     for leg, rows, metrics, deltas in sound:
@@ -478,7 +490,7 @@ def main(args: Args) -> None:
             valid = ~fallen & walked
             per_env = []
             for n in range(num_envs):
-                row = _foot_metrics(hi, idx, env_idx=n)
+                row = _foot_metrics(hi, idx, env_idx=n, sim_dt=sim_dt)
                 if not valid[n]:  # failed the task: keep only the honest diagnostics
                     row = {k: (v if k in _ALWAYS_ON else float("nan")) for k, v in row.items()}
                 per_env.append(row)
