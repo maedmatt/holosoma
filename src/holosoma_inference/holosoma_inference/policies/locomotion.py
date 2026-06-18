@@ -2,12 +2,16 @@ import numpy as np
 from termcolor import colored
 
 from .base import BasePolicy
+from .eval_script import DEADMAN_KEYS, SCHEDULE, ScriptRunner
 
 
 class LocomotionPolicy(BasePolicy):
     def __init__(self, config):
         super().__init__(config)
         self.is_standing = False
+        # Scripted command replay: joystick holds select+A (deadman); keyboard latches with 'p'.
+        self._script = ScriptRunner(SCHEDULE, 1.0 / self.rl_rate, logger=self.logger)
+        self._script_active = False  # keyboard 'p' toggle; joystick uses the deadman instead
 
     def get_current_obs_buffer_dict(self, robot_state_data):
         current_obs_buffer_dict = super().get_current_obs_buffer_dict(robot_state_data)
@@ -59,6 +63,8 @@ class LocomotionPolicy(BasePolicy):
             self._handle_stand_command()
         elif keycode == "z":
             self._handle_zero_velocity()
+        elif keycode == "p":
+            self._toggle_script()
 
         self._print_control_status()
 
@@ -72,6 +78,41 @@ class LocomotionPolicy(BasePolicy):
             self._handle_stand_command()
         elif cur_key == "L2":
             self._handle_zero_velocity()
+
+    def _drive_script(self):
+        """Set the velocity command from the next schedule tick (stand still when finished)."""
+        cmd = self._script.step()
+        if cmd is None:  # schedule finished: stand still
+            self.lin_vel_command[:] = 0.0
+            self.ang_vel_command[:] = 0.0
+        else:
+            self.lin_vel_command[0, 0], self.lin_vel_command[0, 1] = cmd[0], cmd[1]
+            self.ang_vel_command[0, 0] = cmd[2]
+        self.stand_command[0, 0] = 1
+
+    def _toggle_script(self):
+        """Keyboard 'p': start the scripted path from the top, or stop it and stand still."""
+        self._script_active = not self._script_active
+        if self._script_active:
+            self._script.reset()
+            self.logger.info(colored("Scripted path: START (press p again to stop)", "cyan"))
+        else:
+            self._handle_zero_velocity()
+            self.logger.info(colored("Scripted path: STOP", "cyan"))
+
+    def process_joystick_input(self):
+        """Deadman replay: hold select+A to drive commands from SCHEDULE, else manual."""
+        msg = self.interface.get_joystick_msg()
+        if getattr(msg, "keys", 0) == DEADMAN_KEYS:
+            self._drive_script()
+            return
+        super().process_joystick_input()
+
+    def policy_action(self):
+        """Keyboard mode: drive the scripted path each tick while 'p' is latched on."""
+        if self._script_active:
+            self._drive_script()
+        super().policy_action()
 
     def _handle_velocity_control(self, keycode):
         """Handle linear velocity control."""

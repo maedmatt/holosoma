@@ -53,6 +53,7 @@ def _print_control_guide(policy_class, use_joystick: bool, dual_mode: bool = Fal
             logger.info("  Start button   - Switch walking/standing mode")
             logger.info("  Left stick     - Adjust linear velocity (forward/backward/left/right)")
             logger.info("  Right stick    - Adjust angular velocity (turn left/right)")
+            logger.info("  Hold select+A  - Run scripted eval path (release = back to manual)")
     else:
         logger.info("⌨️  Using KEYBOARD control mode")
         logger.info("")
@@ -76,6 +77,7 @@ def _print_control_guide(policy_class, use_joystick: bool, dual_mode: bool = Fal
             logger.info("  a/d        - Increase/decrease lateral velocity")
             logger.info("  q/e        - Increase/decrease angular velocity (turn left/right)")
             logger.info("  z          - Set all velocities to zero")
+            logger.info("  p          - Run/stop the scripted eval path")
 
     logger.info("")
     logger.info("🎬 MuJoCo Simulator Controls (⚠️  ONLY in MuJoCo window, NOT this terminal!):")
