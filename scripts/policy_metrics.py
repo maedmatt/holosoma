@@ -77,30 +77,30 @@ _BASELINE_LOCO = {
 
 _BASELINE_FEET = {
     "left": {
-        "forward_03": {"touchdown_vz_peak": 0.8368, "touchdown_vz_rms": 0.8138, "fz_peak_at_touchdown_mean": 817.0503, "foot_accel_peak_at_touchdown_mean": 129.0774, "loading_rate_peak_at_touchdown_mean": 76703.8983},
-        "forward_06": {"touchdown_vz_peak": 0.8161, "touchdown_vz_rms": 0.7739, "fz_peak_at_touchdown_mean": 820.2939, "foot_accel_peak_at_touchdown_mean": 122.4063, "loading_rate_peak_at_touchdown_mean": 103569.5369},
-        "forward_09": {"touchdown_vz_peak": 0.8470, "touchdown_vz_rms": 0.7592, "fz_peak_at_touchdown_mean": 793.1153, "foot_accel_peak_at_touchdown_mean": 150.9989, "loading_rate_peak_at_touchdown_mean": 106066.2186},
-        "backward_03": {"touchdown_vz_peak": 0.8704, "touchdown_vz_rms": 0.8374, "fz_peak_at_touchdown_mean": 1180.6988, "foot_accel_peak_at_touchdown_mean": 127.7350, "loading_rate_peak_at_touchdown_mean": 212913.5762},
-        "backward_06": {"touchdown_vz_peak": 0.9001, "touchdown_vz_rms": 0.8472, "fz_peak_at_touchdown_mean": 1156.6263, "foot_accel_peak_at_touchdown_mean": 139.3306, "loading_rate_peak_at_touchdown_mean": 203310.2656},
-        "backward_09": {"touchdown_vz_peak": 0.9795, "touchdown_vz_rms": 0.8958, "fz_peak_at_touchdown_mean": 1144.4947, "foot_accel_peak_at_touchdown_mean": 147.0062, "loading_rate_peak_at_touchdown_mean": 195815.6832},
-        "strafe_left": {"touchdown_vz_peak": 0.9021, "touchdown_vz_rms": 0.8819, "fz_peak_at_touchdown_mean": 1028.2224, "foot_accel_peak_at_touchdown_mean": 127.0523, "loading_rate_peak_at_touchdown_mean": 45025.3025},
-        "strafe_right": {"touchdown_vz_peak": 0.8867, "touchdown_vz_rms": 0.8508, "fz_peak_at_touchdown_mean": 1186.1900, "foot_accel_peak_at_touchdown_mean": 109.1735, "loading_rate_peak_at_touchdown_mean": 198158.1087},
-        "yaw_left": {"touchdown_vz_peak": 0.8953, "touchdown_vz_rms": 0.8757, "fz_peak_at_touchdown_mean": 1187.4948, "foot_accel_peak_at_touchdown_mean": 118.3354, "loading_rate_peak_at_touchdown_mean": 150300.0453},
-        "yaw_right": {"touchdown_vz_peak": 0.9167, "touchdown_vz_rms": 0.8880, "fz_peak_at_touchdown_mean": 1229.3020, "foot_accel_peak_at_touchdown_mean": 105.0751, "loading_rate_peak_at_touchdown_mean": 106064.3560},
-        "avg": {"touchdown_vz_peak": 0.8851, "touchdown_vz_rms": 0.8424, "fz_peak_at_touchdown_mean": 1054.3489, "foot_accel_peak_at_touchdown_mean": 127.6191, "loading_rate_peak_at_touchdown_mean": 139792.6991},
+        "forward_03": {"touchdown_vz_peak": 0.8368, "touchdown_vz_rms": 0.8138, "fz_peak_at_touchdown_mean": 817.0503, "foot_accel_peak_at_touchdown_mean": 129.0774, "loading_rate_peak_at_touchdown_mean": 76703.8984, "foot_slip_speed_mean": 0.0109, "base_vz_peak_at_touchdown_mean": 0.3491, "base_accel_peak_at_touchdown_mean": 12.4458},
+        "forward_06": {"touchdown_vz_peak": 0.8161, "touchdown_vz_rms": 0.7739, "fz_peak_at_touchdown_mean": 820.2939, "foot_accel_peak_at_touchdown_mean": 122.4063, "loading_rate_peak_at_touchdown_mean": 103569.5372, "foot_slip_speed_mean": 0.024, "base_vz_peak_at_touchdown_mean": 0.4412, "base_accel_peak_at_touchdown_mean": 12.9434},
+        "forward_09": {"touchdown_vz_peak": 0.847, "touchdown_vz_rms": 0.7592, "fz_peak_at_touchdown_mean": 793.1153, "foot_accel_peak_at_touchdown_mean": 150.9989, "loading_rate_peak_at_touchdown_mean": 106066.2185, "foot_slip_speed_mean": 0.0388, "base_vz_peak_at_touchdown_mean": 0.537, "base_accel_peak_at_touchdown_mean": 12.538},
+        "backward_03": {"touchdown_vz_peak": 0.8704, "touchdown_vz_rms": 0.8374, "fz_peak_at_touchdown_mean": 1180.6988, "foot_accel_peak_at_touchdown_mean": 127.735, "loading_rate_peak_at_touchdown_mean": 212913.5752, "foot_slip_speed_mean": 0.0117, "base_vz_peak_at_touchdown_mean": 0.2503, "base_accel_peak_at_touchdown_mean": 15.6325},
+        "backward_06": {"touchdown_vz_peak": 0.9001, "touchdown_vz_rms": 0.8472, "fz_peak_at_touchdown_mean": 1156.6263, "foot_accel_peak_at_touchdown_mean": 139.3306, "loading_rate_peak_at_touchdown_mean": 203310.2683, "foot_slip_speed_mean": 0.0297, "base_vz_peak_at_touchdown_mean": 0.2882, "base_accel_peak_at_touchdown_mean": 13.1282},
+        "backward_09": {"touchdown_vz_peak": 0.9795, "touchdown_vz_rms": 0.8958, "fz_peak_at_touchdown_mean": 1144.4947, "foot_accel_peak_at_touchdown_mean": 147.0062, "loading_rate_peak_at_touchdown_mean": 195815.6833, "foot_slip_speed_mean": 0.0591, "base_vz_peak_at_touchdown_mean": 0.3543, "base_accel_peak_at_touchdown_mean": 11.6772},
+        "strafe_left": {"touchdown_vz_peak": 0.9021, "touchdown_vz_rms": 0.8819, "fz_peak_at_touchdown_mean": 1028.2224, "foot_accel_peak_at_touchdown_mean": 127.0523, "loading_rate_peak_at_touchdown_mean": 45025.3024, "foot_slip_speed_mean": 0.0095, "base_vz_peak_at_touchdown_mean": 0.3026, "base_accel_peak_at_touchdown_mean": 11.7652},
+        "strafe_right": {"touchdown_vz_peak": 0.8867, "touchdown_vz_rms": 0.8508, "fz_peak_at_touchdown_mean": 1186.19, "foot_accel_peak_at_touchdown_mean": 109.1735, "loading_rate_peak_at_touchdown_mean": 198158.108, "foot_slip_speed_mean": 0.0109, "base_vz_peak_at_touchdown_mean": 0.2536, "base_accel_peak_at_touchdown_mean": 16.8851},
+        "yaw_left": {"touchdown_vz_peak": 0.8953, "touchdown_vz_rms": 0.8757, "fz_peak_at_touchdown_mean": 1187.4948, "foot_accel_peak_at_touchdown_mean": 118.3354, "loading_rate_peak_at_touchdown_mean": 150300.0459, "foot_slip_speed_mean": 0.0071, "base_vz_peak_at_touchdown_mean": 0.3018, "base_accel_peak_at_touchdown_mean": 15.8356},
+        "yaw_right": {"touchdown_vz_peak": 0.9167, "touchdown_vz_rms": 0.888, "fz_peak_at_touchdown_mean": 1229.302, "foot_accel_peak_at_touchdown_mean": 105.0751, "loading_rate_peak_at_touchdown_mean": 106064.3556, "foot_slip_speed_mean": 0.0082, "base_vz_peak_at_touchdown_mean": 0.2611, "base_accel_peak_at_touchdown_mean": 14.0761},
+        "avg": {"touchdown_vz_peak": 0.8851, "touchdown_vz_rms": 0.8424, "fz_peak_at_touchdown_mean": 1054.3489, "foot_accel_peak_at_touchdown_mean": 127.6191, "loading_rate_peak_at_touchdown_mean": 139792.6993, "foot_slip_speed_mean": 0.021, "base_vz_peak_at_touchdown_mean": 0.3339, "base_accel_peak_at_touchdown_mean": 13.6927},
     },
     "right": {
-        "forward_03": {"touchdown_vz_peak": 0.9626, "touchdown_vz_rms": 0.8995, "fz_peak_at_touchdown_mean": 931.1914, "foot_accel_peak_at_touchdown_mean": 151.8125, "loading_rate_peak_at_touchdown_mean": 85862.1603},
-        "forward_06": {"touchdown_vz_peak": 0.8955, "touchdown_vz_rms": 0.8129, "fz_peak_at_touchdown_mean": 880.7142, "foot_accel_peak_at_touchdown_mean": 125.4287, "loading_rate_peak_at_touchdown_mean": 116342.4806},
-        "forward_09": {"touchdown_vz_peak": 0.9195, "touchdown_vz_rms": 0.7709, "fz_peak_at_touchdown_mean": 841.6933, "foot_accel_peak_at_touchdown_mean": 151.2883, "loading_rate_peak_at_touchdown_mean": 110781.1779},
-        "backward_03": {"touchdown_vz_peak": 1.0508, "touchdown_vz_rms": 0.9871, "fz_peak_at_touchdown_mean": 1223.9215, "foot_accel_peak_at_touchdown_mean": 133.2084, "loading_rate_peak_at_touchdown_mean": 215462.0725},
-        "backward_06": {"touchdown_vz_peak": 1.0545, "touchdown_vz_rms": 1.0228, "fz_peak_at_touchdown_mean": 1242.6964, "foot_accel_peak_at_touchdown_mean": 156.8703, "loading_rate_peak_at_touchdown_mean": 215800.1812},
-        "backward_09": {"touchdown_vz_peak": 1.1182, "touchdown_vz_rms": 1.0585, "fz_peak_at_touchdown_mean": 1271.9137, "foot_accel_peak_at_touchdown_mean": 174.5385, "loading_rate_peak_at_touchdown_mean": 214755.3314},
-        "strafe_left": {"touchdown_vz_peak": 0.9970, "touchdown_vz_rms": 0.9613, "fz_peak_at_touchdown_mean": 1324.9567, "foot_accel_peak_at_touchdown_mean": 127.1626, "loading_rate_peak_at_touchdown_mean": 226726.5442},
-        "strafe_right": {"touchdown_vz_peak": 1.1526, "touchdown_vz_rms": 0.9846, "fz_peak_at_touchdown_mean": 1076.0105, "foot_accel_peak_at_touchdown_mean": 155.9937, "loading_rate_peak_at_touchdown_mean": 49129.9895},
-        "yaw_left": {"touchdown_vz_peak": 0.9876, "touchdown_vz_rms": 0.9421, "fz_peak_at_touchdown_mean": 1174.3806, "foot_accel_peak_at_touchdown_mean": 123.4693, "loading_rate_peak_at_touchdown_mean": 53130.9817},
-        "yaw_right": {"touchdown_vz_peak": 1.1062, "touchdown_vz_rms": 1.0214, "fz_peak_at_touchdown_mean": 1265.3617, "foot_accel_peak_at_touchdown_mean": 127.7695, "loading_rate_peak_at_touchdown_mean": 64694.6245},
-        "avg": {"touchdown_vz_peak": 1.0245, "touchdown_vz_rms": 0.9461, "fz_peak_at_touchdown_mean": 1123.2840, "foot_accel_peak_at_touchdown_mean": 142.7542, "loading_rate_peak_at_touchdown_mean": 135268.5544},
+        "forward_03": {"touchdown_vz_peak": 0.9626, "touchdown_vz_rms": 0.8995, "fz_peak_at_touchdown_mean": 931.1914, "foot_accel_peak_at_touchdown_mean": 151.8125, "loading_rate_peak_at_touchdown_mean": 85862.1607, "foot_slip_speed_mean": 0.0133, "base_vz_peak_at_touchdown_mean": 0.3952, "base_accel_peak_at_touchdown_mean": 14.3105},
+        "forward_06": {"touchdown_vz_peak": 0.8955, "touchdown_vz_rms": 0.8129, "fz_peak_at_touchdown_mean": 880.7142, "foot_accel_peak_at_touchdown_mean": 125.4287, "loading_rate_peak_at_touchdown_mean": 116342.479, "foot_slip_speed_mean": 0.0276, "base_vz_peak_at_touchdown_mean": 0.4542, "base_accel_peak_at_touchdown_mean": 13.8217},
+        "forward_09": {"touchdown_vz_peak": 0.9195, "touchdown_vz_rms": 0.7709, "fz_peak_at_touchdown_mean": 841.6933, "foot_accel_peak_at_touchdown_mean": 151.2883, "loading_rate_peak_at_touchdown_mean": 110781.1775, "foot_slip_speed_mean": 0.0486, "base_vz_peak_at_touchdown_mean": 0.537, "base_accel_peak_at_touchdown_mean": 12.6079},
+        "backward_03": {"touchdown_vz_peak": 1.0508, "touchdown_vz_rms": 0.9871, "fz_peak_at_touchdown_mean": 1223.9215, "foot_accel_peak_at_touchdown_mean": 133.2084, "loading_rate_peak_at_touchdown_mean": 215462.0718, "foot_slip_speed_mean": 0.0134, "base_vz_peak_at_touchdown_mean": 0.322, "base_accel_peak_at_touchdown_mean": 16.081},
+        "backward_06": {"touchdown_vz_peak": 1.0545, "touchdown_vz_rms": 1.0228, "fz_peak_at_touchdown_mean": 1242.6964, "foot_accel_peak_at_touchdown_mean": 156.8703, "loading_rate_peak_at_touchdown_mean": 215800.1802, "foot_slip_speed_mean": 0.0271, "base_vz_peak_at_touchdown_mean": 0.3488, "base_accel_peak_at_touchdown_mean": 13.7326},
+        "backward_09": {"touchdown_vz_peak": 1.1182, "touchdown_vz_rms": 1.0585, "fz_peak_at_touchdown_mean": 1271.9137, "foot_accel_peak_at_touchdown_mean": 174.5385, "loading_rate_peak_at_touchdown_mean": 214755.3326, "foot_slip_speed_mean": 0.0531, "base_vz_peak_at_touchdown_mean": 0.3812, "base_accel_peak_at_touchdown_mean": 13.0923},
+        "strafe_left": {"touchdown_vz_peak": 0.997, "touchdown_vz_rms": 0.9613, "fz_peak_at_touchdown_mean": 1324.9567, "foot_accel_peak_at_touchdown_mean": 127.1626, "loading_rate_peak_at_touchdown_mean": 226726.5435, "foot_slip_speed_mean": 0.0126, "base_vz_peak_at_touchdown_mean": 0.3273, "base_accel_peak_at_touchdown_mean": 19.228},
+        "strafe_right": {"touchdown_vz_peak": 1.1526, "touchdown_vz_rms": 0.9846, "fz_peak_at_touchdown_mean": 1076.0105, "foot_accel_peak_at_touchdown_mean": 155.9937, "loading_rate_peak_at_touchdown_mean": 49129.9897, "foot_slip_speed_mean": 0.013, "base_vz_peak_at_touchdown_mean": 0.3659, "base_accel_peak_at_touchdown_mean": 12.1165},
+        "yaw_left": {"touchdown_vz_peak": 0.9876, "touchdown_vz_rms": 0.9421, "fz_peak_at_touchdown_mean": 1174.3806, "foot_accel_peak_at_touchdown_mean": 123.4693, "loading_rate_peak_at_touchdown_mean": 53130.982, "foot_slip_speed_mean": 0.0131, "base_vz_peak_at_touchdown_mean": 0.2896, "base_accel_peak_at_touchdown_mean": 11.8742},
+        "yaw_right": {"touchdown_vz_peak": 1.1062, "touchdown_vz_rms": 1.0214, "fz_peak_at_touchdown_mean": 1265.3617, "foot_accel_peak_at_touchdown_mean": 127.7695, "loading_rate_peak_at_touchdown_mean": 64694.6245, "foot_slip_speed_mean": 0.0113, "base_vz_peak_at_touchdown_mean": 0.3396, "base_accel_peak_at_touchdown_mean": 12.8062},
+        "avg": {"touchdown_vz_peak": 1.0245, "touchdown_vz_rms": 0.9461, "fz_peak_at_touchdown_mean": 1123.284, "foot_accel_peak_at_touchdown_mean": 142.7542, "loading_rate_peak_at_touchdown_mean": 135268.5541, "foot_slip_speed_mean": 0.0233, "base_vz_peak_at_touchdown_mean": 0.3761, "base_accel_peak_at_touchdown_mean": 13.9671},
     },
 }
 
@@ -277,6 +277,16 @@ def _foot_metrics(npz_hi: dict, foot_idx: int, env_idx: int, sim_dt: float) -> d
     # 50 Hz control stream aliases them away. diff() returns T-1 samples (_peak_in_window guards).
     foot_accel = np.linalg.norm(np.diff(vel, axis=0) / sim_dt, axis=-1)
     loading_rate = np.diff(fz) / sim_dt
+    # Slip/scuff: world-frame horizontal foot speed while loaded. ~0 for a planted foot,
+    # >0 only when it slides -- the channel the (normal-only) contact force can't see.
+    in_contact = fz > 1.0  # matches detect_touchdowns fire_fz
+    foot_horiz_speed = np.linalg.norm(vel[:, :2], axis=-1)
+    slip_speed = float(np.mean(foot_horiz_speed[in_contact])) if in_contact.any() else 0.0
+    # Base-drop channel: a soft-looking foot landing can hide the impact in the body dropping
+    # with it. The foot metrics above are blind to this; the base vertical shock is not.
+    base_vz = npz_hi["base_lin_vel"][:, env_idx, 2]
+    base_vz_peak = _peak_in_window(np.maximum(-base_vz, 0.0), td)
+    base_accel_peak = _peak_in_window(np.abs(np.diff(base_vz) / sim_dt), td)
     return {
         "touchdown_count": float(len(td)),
         "touchdown_vz_peak": touchdown_vz_peak(vz_at_td),
@@ -284,6 +294,9 @@ def _foot_metrics(npz_hi: dict, foot_idx: int, env_idx: int, sim_dt: float) -> d
         "fz_peak_at_touchdown_mean": _peak_in_window(fz, td),
         "foot_accel_peak_at_touchdown_mean": _peak_in_window(foot_accel, td),
         "loading_rate_peak_at_touchdown_mean": _peak_in_window(loading_rate, td),
+        "foot_slip_speed_mean": slip_speed,
+        "base_vz_peak_at_touchdown_mean": base_vz_peak,
+        "base_accel_peak_at_touchdown_mean": base_accel_peak,
     }
 
 
