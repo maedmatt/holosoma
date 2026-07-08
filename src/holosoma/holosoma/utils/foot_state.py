@@ -21,6 +21,7 @@ class FootState:
     After each step() the public tensors describe the current control step:
 
     - fired: touchdown fired this step (bool)
+    - vz: vertical foot velocity this step
     - vz_pre: vertical foot velocity one step before this one
     - approach_speed: downward component of vz_pre (>= 0)
     - fz: vertical contact force this step
@@ -50,6 +51,7 @@ class FootState:
 
         shape = (num_envs, num_feet)
         self.fired = torch.zeros(shape, dtype=torch.bool, device=device)
+        self.vz = torch.zeros(shape, device=device)
         self.vz_pre = torch.zeros(shape, device=device)
         self.approach_speed = torch.zeros(shape, device=device)
         self.fz = torch.zeros(shape, device=device)
@@ -69,6 +71,7 @@ class FootState:
     def step(self, vz: Tensor, fz: Tensor) -> None:
         """Advance one control step from per-foot vertical velocity and contact force."""
         self.fz = fz
+        self.vz = vz
         self.fired = self._detector.step(vz, fz)
         self.vz_pre = self._vz_prev
         self.approach_speed = (-self.vz_pre).clamp(min=0.0)

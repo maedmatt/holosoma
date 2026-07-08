@@ -169,6 +169,32 @@ class TouchdownSpeedPenalty(RewardTermBase):
         return per_foot.sum(dim=1)
 
 
+class TouchdownResidualSpeedPenalty(RewardTermBase):
+    """Penalize downward foot speed in excess of target, sampled on the touchdown step.
+
+    Like TouchdownSpeedPenalty, but uses the velocity of the step the
+    touchdown fires (foot_state.vz) instead of the step before it. By then
+    the ground has started to slow the foot, so this measures how much
+    downward motion is left after first contact. Quadratic on the excess
+    over target_downward_speed, applied on the step a touchdown fires,
+    summed over feet.
+    """
+
+    def __init__(self, cfg: RewardTermCfg, env: Any) -> None:
+        super().__init__(cfg, env)
+
+    def reset(self, env_ids: torch.Tensor | None = None) -> None:
+        pass
+
+    def __call__(self, env: Any, **kwargs: Any) -> torch.Tensor:
+        target_downward_speed = float(kwargs.get("target_downward_speed", 0.0))
+        foot_state = env.foot_state
+        residual_speed = (-foot_state.vz).clamp(min=0.0)
+        excess = (residual_speed - target_downward_speed).clamp(min=0.0)
+        per_foot = torch.where(foot_state.fired, excess.square(), torch.zeros_like(excess))
+        return per_foot.sum(dim=1)
+
+
 # ================================================================================================
 # Limit Rewards
 # ================================================================================================

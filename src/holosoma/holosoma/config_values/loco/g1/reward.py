@@ -392,14 +392,29 @@ _penalty_touchdown_speed = RewardTermCfg(
     tags=["penalty_curriculum"],
 )
 
+_penalty_touchdown_residual_speed = RewardTermCfg(
+    func="holosoma.managers.reward.terms.locomotion:TouchdownResidualSpeedPenalty",
+    weight=0.0,
+    params={"target_downward_speed": 0.0},
+    tags=["penalty_curriculum"],
+)
+
 g1_23dof_loco_quiet_touchdown = replace(
     g1_23dof_loco_quiet,
-    terms={**g1_23dof_loco_quiet.terms, "penalty_touchdown_speed": _penalty_touchdown_speed},
+    terms={
+        **g1_23dof_loco_quiet.terms,
+        "penalty_touchdown_speed": _penalty_touchdown_speed,
+        "penalty_touchdown_residual_speed": _penalty_touchdown_residual_speed,
+    },
 )
 
 g1_23dof_loco_quiet_touchdown_fast_sac = replace(
     g1_23dof_loco_quiet_fast_sac,
-    terms={**g1_23dof_loco_quiet_fast_sac.terms, "penalty_touchdown_speed": _penalty_touchdown_speed},
+    terms={
+        **g1_23dof_loco_quiet_fast_sac.terms,
+        "penalty_touchdown_speed": _penalty_touchdown_speed,
+        "penalty_touchdown_residual_speed": _penalty_touchdown_residual_speed,
+    },
 )
 
 __all__ = [
