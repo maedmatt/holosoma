@@ -1,6 +1,6 @@
 """Replay a fixed schedule of velocity commands instead of the joystick.
 
-Hold the deadman combo (select+A) on the wireless controller and the robot
+Hold the deadman combo (X+down) on the wireless controller and the robot
 walks through SCHEDULE below; release and you are back on normal stick control
 with the schedule frozen where it paused. This mirrors the sim benchmark
 (holosoma/agents/callbacks/policy_eval.py) so the same path can be replayed
@@ -18,8 +18,8 @@ from dataclasses import dataclass
 from termcolor import colored
 
 
-# select+A wireless-controller bitmask (base_interface keymap: select=8, A=256).
-DEADMAN_KEYS = 264
+# X+down wireless-controller bitmask (base_interface keymap: X=1024, down=16384).
+DEADMAN_KEYS = 17408
 
 SETTLE_S = 1.0  # idle pause before each scenario; set to 0 to chain directly
 

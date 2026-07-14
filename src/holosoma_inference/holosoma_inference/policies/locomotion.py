@@ -9,7 +9,7 @@ class LocomotionPolicy(BasePolicy):
     def __init__(self, config):
         super().__init__(config)
         self.is_standing = False
-        # Scripted command replay: joystick holds select+A (deadman); keyboard latches with 'p'.
+        # Scripted command replay: joystick holds X+down (deadman); keyboard latches with 'p'.
         self._script = ScriptRunner(SCHEDULE, 1.0 / self.rl_rate, logger=self.logger)
         self._script_active = False  # keyboard 'p' toggle; joystick uses the deadman instead
 
@@ -101,7 +101,7 @@ class LocomotionPolicy(BasePolicy):
             self.logger.info(colored("Scripted path: STOP", "cyan"))
 
     def process_joystick_input(self):
-        """Deadman replay: hold select+A to drive commands from SCHEDULE, else manual."""
+        """Deadman replay: hold X+down to drive commands from SCHEDULE, else manual."""
         msg = self.interface.get_joystick_msg()
         if getattr(msg, "keys", 0) == DEADMAN_KEYS:
             self._drive_script()
