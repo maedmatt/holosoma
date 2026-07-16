@@ -24,7 +24,7 @@ class TouchdownDetector:
         num_envs: int,
         num_feet: int = 2,
         *,
-        vz_arm_thr: float = 0.3,
+        vz_arm_thr: float = 0.2,  # loading transient arms this; 0.3 missed slow soft gaits (2026-07-16)
         fz_fire_thr: float = 1.0,  # 1 N matches legged_gym (PhysX mesh-contact noise floor)
     ) -> None:
         """

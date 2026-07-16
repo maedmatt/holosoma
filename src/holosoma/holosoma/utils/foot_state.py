@@ -36,7 +36,7 @@ class FootState:
         dt: float,
         device: torch.device | str,
         *,
-        vz_arm_thr: float = 0.3,
+        vz_arm_thr: float = 0.2,  # loading transient arms this; 0.3 missed slow soft gaits (2026-07-16)
         fz_fire_thr: float = 1.0,
         contact_force_threshold: float = 1.0,
         force_window_s: float = 0.06,

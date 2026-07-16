@@ -24,6 +24,7 @@ logs
 logs_eval
 models/*
 checkpoints/
+benchmarks/
 
 # Isaacsim Converted Files
 src/holosoma/holosoma/data/robots/converted/

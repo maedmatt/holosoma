@@ -164,7 +164,7 @@ def detect_fallen(npz: dict, tail_steps: int) -> np.ndarray:
 
 
 def detect_touchdowns(vz: np.ndarray, fz: np.ndarray,
-                      arm_vz: float = -0.3, fire_fz: float = 1.0) -> np.ndarray:
+                      arm_vz: float = -0.2, fire_fz: float = 1.0) -> np.ndarray:
     """Touchdown indices for one foot.
 
     Arm when vz < arm_vz; fire on rising edge of fz through fire_fz.
