@@ -103,8 +103,14 @@ class LocomotionPolicy(BasePolicy):
     def process_joystick_input(self):
         """Deadman replay: hold X+down to drive commands from SCHEDULE, else manual."""
         msg = self.interface.get_joystick_msg()
-        if getattr(msg, "keys", 0) == DEADMAN_KEYS:
+        keys = getattr(msg, "keys", 0)
+        if keys == DEADMAN_KEYS:
             self._drive_script()
+            return
+        if keys & DEADMAN_KEYS:
+            # Only one of the two deadman buttons is held (mid press/release):
+            # ignore this frame so X/down don't trigger their normal actions
+            # (down would lower kp_level).
             return
         super().process_joystick_input()
 
